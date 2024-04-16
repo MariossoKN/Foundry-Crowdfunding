@@ -8,7 +8,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
     error CrowdfundingProject__NotEnoughEthSent();
     error CrowdfundingProject__TooMuchEthSent();
     error CrowdfundingProject__MinInvestmentGreaterThanMaxInvestment();
-    error CrowdfundingProject__DeadlineIsTooShort(uint256);
     error CrowdfundingProject__AmountCrowfundedCantBeLessThanMaxInvestment();
     error CrowdfundingProject__AmountEthSentIsGreaterThanTheRestCrowfundingNeeded(
         uint256
@@ -33,6 +32,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
 
     address payable private s_crowdfundingContractAddress;
 
+    string private s_projectName;
     address payable private immutable i_owner;
     uint256 private immutable i_crowdfundingAmountNeeded;
     uint256 private s_fundedAmount;
@@ -65,6 +65,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
 
     // creates the project with information given by project owner
     constructor(
+        string memory _projectName,
         address payable _projectOwner,
         uint256 _maxCrowfundingAmount,
         uint256 _interestRateInPercent,
@@ -72,7 +73,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         uint256 _maxInvestment,
         uint256 _deadlineInDays,
         uint256 _investmentPeriod,
-        uint256 minDeadlineInDays,
+        // uint256 minDeadlineInDays,
         address payable _crowdfundingContractAddress
     ) payable {
         if (_maxCrowfundingAmount < _maxInvestment) {
@@ -81,9 +82,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         if (_minInvestment > _maxInvestment) {
             revert CrowdfundingProject__MinInvestmentGreaterThanMaxInvestment();
         }
-        if (_deadlineInDays < minDeadlineInDays) {
-            revert CrowdfundingProject__DeadlineIsTooShort(minDeadlineInDays);
-        }
+        s_projectName = _projectName;
         i_owner = _projectOwner;
         i_crowdfundingAmountNeeded = _maxCrowfundingAmount;
         s_fundedAmount = 0;
@@ -260,11 +259,15 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         return fullAmountToBePaid;
     }
 
+    function getProjectName() external view returns (string memory) {
+        return s_projectName;
+    }
+
     function getOwner() external view returns (address) {
         return i_owner;
     }
 
-    function getProjectMaxCrowdfundingAmount() external view returns (uint256) {
+    function getCrowdfundingAmount() external view returns (uint256) {
         return i_crowdfundingAmountNeeded;
     }
 

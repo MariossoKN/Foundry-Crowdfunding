@@ -23,6 +23,7 @@ contract Crowdfunding {
         uint256 _fundAmount
     );
 
+    error CrowdfundingProject__DeadlineIsTooShort(uint256);
     error Crowdfunding__YouAreNotAllowedToCancelThisProject();
     error Crowdfunding__YouHaveToSendTheExactAmountForInitialFees(uint256);
     error Crowdfunding__CanBeCalledOnlyByOwner();
@@ -46,35 +47,51 @@ contract Crowdfunding {
         i_owner = payable(msg.sender);
     }
 
-    // lets the project owner to create a new project; project owner has to pay the initial fees - if projects funding will be successful, fees will be sent back to this contract; if the projects funding will be canceled, the initial fees will be returned to project owner
+    /**
+     * @dev lets the crowdfunding project owner to create a new project (new contract); project owner has to pay the initial fee which is % from the crowdfunded amount. If projects funding will be successful, fees will be sent back to this contract; if the project will be canceled, the initial fees will be returned to project owner (minus gas fees)
+     * @param _crowdfundedAmount the amount the project owner wants to crowdfund
+     * @param _interestRateInPercent interest rates which should be paid to investors after vesting time
+     * @param _minInvestment minimum investment which can be invested by investors
+     * @param _maxInvestment maximum investment which can be invested by investors
+     * @param _deadlineInDays for how long the project should be active. When the deadline is reached and:
+     * 1. crowdfunding amount is reached, project will be set to INVESTING_ACITVE status and the project owner can withdraw the crowdfunded amount
+     * 2. crowdfunding amount is not reached, project will be set to CANCELLED status and the investors will be paid back the invested amount
+     * @param _investmentPeriodDays for how long the crowdfunded amount will be invested. After this time, investors have to be paid out the invested amount + interest
+     */
     function createProject(
-        uint256 _maxCrowdfundingAmount,
+        string memory _projectName,
+        uint256 _crowdfundedAmount,
         uint256 _interestRateInPercent,
         uint256 _minInvestment,
         uint256 _maxInvestment,
         uint256 _deadlineInDays,
         uint256 _investmentPeriodDays
     ) external payable returns (CrowdfundingProject) {
-        uint256 initialFees = calculateInitialFee(_maxCrowdfundingAmount);
+        uint256 initialFees = calculateInitialFee(_crowdfundedAmount);
         // q should there be a chek for min. msg.value, so if the project is canceled the investors pay back doesnt fail
         if (msg.value != initialFees) {
             revert Crowdfunding__YouHaveToSendTheExactAmountForInitialFees(
                 initialFees
             );
         }
+        // should add a check for the project name
+        if (_deadlineInDays < i_minDeadlineInDays) {
+            revert CrowdfundingProject__DeadlineIsTooShort(i_minDeadlineInDays);
+        }
         // q does this array need a project name?
         // q should we check for the minDeadline here?
         CrowdfundingProject crowdfundingProject = new CrowdfundingProject{
             value: msg.value
         }(
+            _projectName,
             payable(msg.sender),
-            _maxCrowdfundingAmount,
+            _crowdfundedAmount,
             _interestRateInPercent,
             _minInvestment,
             _maxInvestment,
             _deadlineInDays,
             _investmentPeriodDays,
-            i_minDeadlineInDays,
+            // i_minDeadlineInDays,
             payable(address(this))
         );
         // q should we use mapping instead of array?
@@ -141,7 +158,9 @@ contract Crowdfunding {
     }
 
     // calculates the initial fees paid by project owner
-    // 1500000000000000000000 (1500 ETH) * 0.5% = 750000000000000000000 (75 ETH) / 100 = 7500000000000000000 (7,5 eth)
+    // 1500000000000000000000 (1500 ETH) * 50000000000000000 (0.05%) / 1e18 = 75000000000000000000
+    // 75000000000000000000 / 100
+    // 750000000000000000 (0,75 ETH) which is 0,05% from 1500 ETH
     function calculateInitialFee(
         uint256 _maxCrowdfundingAmount
     ) public view returns (uint256) {
