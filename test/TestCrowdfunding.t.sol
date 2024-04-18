@@ -17,6 +17,8 @@ contract TestCrowdfunding is Test {
     uint256 minDeadlineInDays;
     uint256 deployerKey;
 
+    uint256 initialFeesToBePaid;
+
     address PROJECT_OWNER = makeAddr("projectOwner");
     address PROJECT_OWNER2 = makeAddr("projectOwner2");
     uint256 STARTING_BALANCE = 100 ether;
@@ -34,8 +36,33 @@ contract TestCrowdfunding is Test {
         (crowdfunding, helperConfig) = deployCrowdfunding.run();
         (crowdfundFeeInPrecent, minDeadlineInDays, deployerKey) = helperConfig
             .activeNetworkConfig();
+
+        initialFeesToBePaid = crowdfunding.calculateInitialFee(
+            CROWDFUNDING_AMOUNT
+        );
+
         vm.deal(PROJECT_OWNER, STARTING_BALANCE);
         vm.deal(PROJECT_OWNER2, STARTING_BALANCE);
+    }
+
+    /////////////////////
+    // helper function //
+    /////////////////////
+
+    function createProject() public returns (CrowdfundingProject) {
+        vm.prank(PROJECT_OWNER);
+        CrowdfundingProject project = crowdfunding.createProject{
+            value: initialFeesToBePaid
+        }(
+            PROJECT_NAME,
+            CROWDFUNDING_AMOUNT,
+            INTEREST_RATE,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            DEADLINE_IN_DAYS,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+        return project;
     }
 
     //////////////////////
@@ -54,10 +81,7 @@ contract TestCrowdfunding is Test {
     /////////////////////////
     // createProject TESTs //
     /////////////////////////
-    function testShouldRevertIfTheAmountSentIsZero() public {
-        uint256 initialFeesToBePaid = crowdfunding.calculateInitialFee(
-            CROWDFUNDING_AMOUNT
-        );
+    function testRevertIfTheAmountSentIsZero() public {
         vm.expectRevert(
             abi.encodeWithSelector(
                 Crowdfunding
@@ -78,12 +102,9 @@ contract TestCrowdfunding is Test {
         );
     }
 
-    function testFuzzShouldRevertIfTheAmountSentIsLessThanFeesToBePaid(
+    function testFuzz_RevertIfTheAmountSentIsLessThanFeesToBePaid(
         uint256 _amount
     ) public {
-        uint256 initialFeesToBePaid = crowdfunding.calculateInitialFee(
-            CROWDFUNDING_AMOUNT
-        );
         uint256 amount = bound(_amount, 1, initialFeesToBePaid - 1);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -105,12 +126,9 @@ contract TestCrowdfunding is Test {
         );
     }
 
-    function testFuzzShouldRevertIfTheAmountSentIsMoreThanFeesToBePaid(
+    function testFuzz_RevertIfTheAmountSentIsMoreThanFeesToBePaid(
         uint256 _amount
     ) public {
-        uint256 initialFeesToBePaid = crowdfunding.calculateInitialFee(
-            CROWDFUNDING_AMOUNT
-        );
         uint256 amount = bound(
             _amount,
             initialFeesToBePaid + 1,
@@ -137,14 +155,46 @@ contract TestCrowdfunding is Test {
         );
     }
 
-    function testShoulRevertIfDeadlineIsMoreThanMinimum() public {}
-
-    function testShouldCreateANewCrowdfundingProjectWithCorrectParameters()
-        public
-    {
-        uint256 initialFeesToBePaid = crowdfunding.calculateInitialFee(
-            CROWDFUNDING_AMOUNT
+    function testFuzz_RevertIfDeadlineIsLessThanMinimum(
+        uint256 _amount
+    ) public {
+        uint256 amount = bound(_amount, 0, minDeadlineInDays - 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Crowdfunding.CrowdfundingProject__DeadlineIsTooShort.selector,
+                minDeadlineInDays
+            )
         );
+        crowdfunding.createProject{value: initialFeesToBePaid}(
+            PROJECT_NAME,
+            CROWDFUNDING_AMOUNT,
+            INTEREST_RATE,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            amount,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+    }
+
+    function testRevertsIfNameOfTheProjectIsEmpty() public {
+        vm.expectRevert(Crowdfunding.Crowdfunding__NameCantBeEmpty.selector);
+        crowdfunding.createProject{value: initialFeesToBePaid}(
+            "",
+            CROWDFUNDING_AMOUNT,
+            INTEREST_RATE,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            DEADLINE_IN_DAYS,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+    }
+
+    function testUpdatesTheProjectsStructWithCorrectData() public {
+        CrowdfundingProject project = createProject();
+        string memory projectName = crowdfunding.
+    }
+
+    function testCreatesANewCrowdfundingProjectWithCorrectParameters() public {
         vm.prank(PROJECT_OWNER);
         CrowdfundingProject project = crowdfunding.createProject{
             value: initialFeesToBePaid
