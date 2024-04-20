@@ -34,8 +34,8 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
 
     string private s_projectName;
     address payable private immutable i_owner;
-    uint256 private immutable i_crowdfundingAmountNeeded;
-    uint256 private s_fundedAmount;
+    uint256 private immutable i_maxCrowdfundingAmount;
+    uint256 private s_currentFundedAmount;
     uint256 private immutable i_interestRateInPercent;
     uint256 private immutable i_minInvestment;
     uint256 private immutable i_maxInvestment;
@@ -84,8 +84,8 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         }
         s_projectName = _projectName;
         i_owner = _projectOwner;
-        i_crowdfundingAmountNeeded = _maxCrowfundingAmount;
-        s_fundedAmount = 0;
+        i_maxCrowdfundingAmount = _maxCrowfundingAmount;
+        s_currentFundedAmount = 0;
         i_interestRateInPercent = _interestRateInPercent;
         i_minInvestment = _minInvestment;
         i_maxInvestment = _maxInvestment;
@@ -98,7 +98,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
 
     // fund the project
     function fund(address _investor) external payable onlyCrowdfundingContract {
-        // do we need to prevent the funder to fund again?
+        // do we need to prevent the investor to fund again? I think we have to otherwise the amountToBePaid will be wrongly calculated.. have to test it !!!
         if (s_projectState != ProjectState.FUNDING_ACTIVE) {
             revert CrowdfundingProject__FundingIsNotActive();
         }
@@ -108,10 +108,10 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         if (msg.value > i_maxInvestment) {
             revert CrowdfundingProject__TooMuchEthSent();
         }
-        uint256 restFundingNeeded = i_crowdfundingAmountNeeded - s_fundedAmount;
-        if (msg.value > restFundingNeeded) {
+        uint256 remainingFundingAmount = getRemainingFundingAmount();
+        if (msg.value > remainingFundingAmount) {
             revert CrowdfundingProject__AmountEthSentIsGreaterThanTheRestCrowfundingNeeded(
-                restFundingNeeded
+                remainingFundingAmount
             );
         }
         uint256 amountToBePaid = calculateAmountToBePaidToInvestor(
@@ -124,7 +124,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
             amountToBePaid,
             false
         );
-        s_fundedAmount += msg.value;
+        s_currentFundedAmount += msg.value;
     }
 
     // calculates how much the investor should get (based on the investment amount and interest rate) if the project is fully funded
@@ -160,7 +160,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
             (block.timestamp - s_projectFundingIntervalStart) >
             (i_deadlineInDays * ONE_DAY_IN_SECONDS)
         ) {
-            if (s_fundedAmount < i_crowdfundingAmountNeeded) {
+            if (s_currentFundedAmount < i_maxCrowdfundingAmount) {
                 s_projectState = ProjectState.CLOSED;
                 payBackInvestorsAndOwner();
             } else {
@@ -208,11 +208,11 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
             revert CrowdfundingProject__InvestingIsNotActive();
         }
-        if (s_fundedAmount < i_crowdfundingAmountNeeded) {
+        if (s_currentFundedAmount < i_maxCrowdfundingAmount) {
             revert CrowdfundingProject__CantWithdrawUntilMaxFundAmountIsReached();
         }
-        uint256 fundedAmount = s_fundedAmount;
-        s_fundedAmount = 0;
+        uint256 fundedAmount = s_currentFundedAmount;
+        s_currentFundedAmount = 0;
         (bool success, ) = (i_owner).call{value: fundedAmount}("");
         require(success, "Withdraw to owner failed");
         (bool success2, ) = (s_crowdfundingContractAddress).call{
@@ -259,6 +259,10 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         return fullAmountToBePaid;
     }
 
+    function getRemainingFundingAmount() public view returns (uint256) {
+        return i_maxCrowdfundingAmount - s_currentFundedAmount;
+    }
+
     function getProjectName() external view returns (string memory) {
         return s_projectName;
     }
@@ -268,11 +272,11 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
     }
 
     function getCrowdfundingAmount() external view returns (uint256) {
-        return i_crowdfundingAmountNeeded;
+        return i_maxCrowdfundingAmount;
     }
 
-    function getProjectFundedAmount() external view returns (uint256) {
-        return s_fundedAmount;
+    function getCurrentFundedAmount() external view returns (uint256) {
+        return s_currentFundedAmount;
     }
 
     function getProjectInterestRateInPercent() external view returns (uint256) {

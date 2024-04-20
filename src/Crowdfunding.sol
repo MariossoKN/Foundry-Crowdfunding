@@ -23,6 +23,19 @@ contract Crowdfunding {
         uint256 _fundAmount
     );
 
+    event ProjectCanceled(
+        address indexed _owner,
+        uint256 indexed _projectIndex
+    );
+
+    modifier onlyProjectOwner(uint256 _projectId) {
+        address owner = s_crowdfundingProjectArray[_projectId].owner;
+        if (msg.sender != owner) {
+            revert Crowdfunding__CanBeCalledOnlyByProjectOwner();
+        }
+        _;
+    }
+
     struct Project {
         CrowdfundingProject projectContract;
         string name;
@@ -33,7 +46,6 @@ contract Crowdfunding {
         uint256 deadlineInDays;
         uint256 investmentPeriodDays;
         address owner;
-        uint256 id;
     }
 
     error CrowdfundingProject__DeadlineIsTooShort(uint256);
@@ -117,8 +129,7 @@ contract Crowdfunding {
             _maxInvestment,
             _deadlineInDays,
             _investmentPeriodDays,
-            payable(msg.sender),
-            s_crowdfundingProjectArray.length
+            payable(msg.sender)
         );
         emit ProjectCreated(
             msg.sender,
@@ -128,7 +139,12 @@ contract Crowdfunding {
         return crowdfundingProject;
     }
 
-    // lets the investor to fund the project, the investment cant be less than the minInvestment and more than the maxInvestment
+    /**
+     * @dev lets the investor to fund to the desired project. The amount of the investment cant be less than the minInvestment and more than the maxInvestment. The amount also cant be more than the remaining crowdfunded amount - can be checked by getRemainingFundAmount function
+     * @dev the project has to be in FUNDING_ACTIVE state
+     * @param _projectId id of the project the user wants to fund
+     */
+    // q what happens if for example the project has a minInvestment of 1 ether, but the project only needs 0,5 ether to be fully funded??
     function fundProject(uint256 _projectId) external payable {
         CrowdfundingProject projectContract = s_crowdfundingProjectArray[
             _projectId
@@ -137,23 +153,27 @@ contract Crowdfunding {
         emit ProjectFunded(msg.sender, _projectId, msg.value);
     }
 
-    // lets the project owner to cancel the project; investors will get their investment back and the project owner will get the back the = initial fees - gas fees
-    function cancelProject(uint256 _projectId) external {
-        address owner = s_crowdfundingProjectArray[_projectId].owner;
-        if (msg.sender != owner) {
-            revert Crowdfunding__YouAreNotAllowedToCancelThisProject();
-        }
+    /**
+     * @dev lets the project owner to cancel the project; investors will get their investment back and the project owner will get back the (initial fees - gas fees). Can only be called by the owner address
+     * @param _projectId id of the project the project owner wants to cancel
+     */
+    function cancelProject(
+        uint256 _projectId
+    ) external onlyProjectOwner(_projectId) {
         CrowdfundingProject projectContract = s_crowdfundingProjectArray[
             _projectId
         ].projectContract;
         projectContract.cancel();
+        emit ProjectCanceled(msg.sender, _projectId);
     }
 
-    // lets the project owner to fund the project contract to be able to pay out the investors (cant forget the gas fees to sent eth to investors), the rest eth will be sent back with the same transaction
-    function ownerFundProject(uint256 _projectId) external payable {
-        if (msg.sender != s_crowdfundingProjectArray[_projectId].owner) {
-            revert Crowdfunding__CanBeCalledOnlyByProjectOwner();
-        }
+    /**
+     * @dev lets the project owner to fund the project contract to be able to pay out the investors (keep in mind that the project owner has to pay gas fees to sent eth to investors)
+     * @param _projectId id of the project the project owner wants to fund
+     */
+    function ownerFundProject(
+        uint256 _projectId
+    ) external payable onlyProjectOwner(_projectId) {
         if (msg.value == 0) {
             revert Crowdfunding__ValueSentCantBeZero();
         }
@@ -166,10 +186,9 @@ contract Crowdfunding {
     // ??? add a function to pay out a single investor ??? just in case the finish function doest work properly
 
     // lets the project owner to finish the project and pay out the investors; project owner has to first fund the project with the ownerFundProject function
-    function finishProject(uint256 _projectId) external {
-        if (msg.sender != s_crowdfundingProjectArray[_projectId].owner) {
-            revert Crowdfunding__CanBeCalledOnlyByProjectOwner();
-        }
+    function finishProject(
+        uint256 _projectId
+    ) external onlyProjectOwner(_projectId) {
         CrowdfundingProject projectContract = s_crowdfundingProjectArray[
             _projectId
         ].projectContract;
@@ -207,10 +226,68 @@ contract Crowdfunding {
     // Getter Functions //
     //////////////////////
 
-    function getProjectContract(
+    function getProjectName(
         uint256 _projectId
-    ) public view returns (CrowdfundingProject) {
-        return s_crowdfundingProjectArray[_projectId].projectContract;
+    ) public view returns (string memory) {
+        return s_crowdfundingProjectArray[_projectId].name;
+    }
+
+    function getCrowdfundingAmount(
+        uint256 _projectId
+    ) public view returns (uint256) {
+        return s_crowdfundingProjectArray[_projectId].crowdfundedAmount;
+    }
+
+    function getInterestRate(uint256 _projectId) public view returns (uint256) {
+        return s_crowdfundingProjectArray[_projectId].interestRateInPercent;
+    }
+
+    function getMinInvestmentAmount(
+        uint256 _projectId
+    ) public view returns (uint256) {
+        return s_crowdfundingProjectArray[_projectId].minInvestment;
+    }
+
+    function getMaxInvestmentAmount(
+        uint256 _projectId
+    ) public view returns (uint256) {
+        return s_crowdfundingProjectArray[_projectId].maxInvestment;
+    }
+
+    function getDeadlineInDays(
+        uint256 _projectId
+    ) public view returns (uint256) {
+        return s_crowdfundingProjectArray[_projectId].deadlineInDays;
+    }
+
+    function getInvestmentPeriodDays(
+        uint256 _projectId
+    ) public view returns (uint256) {
+        return s_crowdfundingProjectArray[_projectId].investmentPeriodDays;
+    }
+
+    function getProjectOwner(uint256 _projectId) public view returns (address) {
+        return s_crowdfundingProjectArray[_projectId].owner;
+    }
+
+    function getProjectIdBasedOnOwnerAddress(
+        address _owner
+    ) public view returns (uint256[] memory) {
+        uint256 arrayLength = s_crowdfundingProjectArray.length;
+        uint256[] memory projectIds = new uint256[](arrayLength); // Preallocate memory
+        uint256 count = 0;
+        for (uint256 i = 0; i < arrayLength; i++) {
+            if (s_crowdfundingProjectArray[i].owner == _owner) {
+                projectIds[count] = i;
+                count++;
+            }
+        }
+        // Trim the array to remove any unused elements
+        uint256[] memory result = new uint256[](count);
+        for (uint256 j = 0; j < count; j++) {
+            result[j] = projectIds[j];
+        }
+        return result;
     }
 
     function getInitialFees(
@@ -239,12 +316,12 @@ contract Crowdfunding {
                 .getProjectStatus();
     }
 
-    function getProjectAmountFunded(
+    function getProjectCurrentFundedAmount(
         uint256 _projectId
     ) public view returns (uint256) {
         return
             (s_crowdfundingProjectArray[_projectId].projectContract)
-                .getProjectFundedAmount();
+                .getCurrentFundedAmount();
     }
 
     function getFullAmountToBePaidOutToInvestorsWithoutGasFees(
@@ -253,6 +330,14 @@ contract Crowdfunding {
         return
             (s_crowdfundingProjectArray[_projectId].projectContract)
                 .calculateFullAmountToBePaidOutToInvestorsWithoutGasFees();
+    }
+
+    function getRemainingFundAmount(
+        uint256 _projectId
+    ) public view returns (uint256) {
+        return
+            (s_crowdfundingProjectArray[_projectId].projectContract)
+                .getRemainingFundingAmount();
     }
 
     fallback() external {}

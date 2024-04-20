@@ -10,6 +10,23 @@ import {Vm} from "../../lib/forge-std/src/Vm.sol";
 import {Test, console} from "../../lib/forge-std/src/Test.sol";
 
 contract TestCrowdfunding is Test {
+    event ProjectCreated(
+        address indexed _owner,
+        CrowdfundingProject indexed _projectAddress,
+        uint256 indexed _projectIndex
+    );
+
+    event ProjectFunded(
+        address indexed _funder,
+        uint256 indexed _projectIndex,
+        uint256 _fundAmount
+    );
+
+    event ProjectCanceled(
+        address indexed _owner,
+        uint256 indexed _projectIndex
+    );
+
     Crowdfunding public crowdfunding;
     HelperConfig public helperConfig;
 
@@ -21,6 +38,8 @@ contract TestCrowdfunding is Test {
 
     address PROJECT_OWNER = makeAddr("projectOwner");
     address PROJECT_OWNER2 = makeAddr("projectOwner2");
+    address INVESTOR = makeAddr("investor");
+    address INVESTOR2 = makeAddr("investor2");
     uint256 STARTING_BALANCE = 100 ether;
 
     string PROJECT_NAME = "Grand Resort Crowdfund Project";
@@ -30,6 +49,10 @@ contract TestCrowdfunding is Test {
     uint256 MAX_INVESTMENT = 50 ether;
     uint256 DEADLINE_IN_DAYS = 25;
     uint256 INVESTMENT_PERIOD_IN_DAYS = 30;
+    uint256 private constant ONE_DAY_IN_SECONDS = 86400;
+
+    uint256 CORRECT_INVESTMENT_AMOUNT = 10 ether;
+    uint256 INCORRECT_INVESTMENT_AMOUNT = 2 ether;
 
     function setUp() external {
         DeployCrowdfunding deployCrowdfunding = new DeployCrowdfunding();
@@ -43,11 +66,13 @@ contract TestCrowdfunding is Test {
 
         vm.deal(PROJECT_OWNER, STARTING_BALANCE);
         vm.deal(PROJECT_OWNER2, STARTING_BALANCE);
+        vm.deal(INVESTOR, STARTING_BALANCE);
+        vm.deal(INVESTOR2, STARTING_BALANCE);
     }
 
-    /////////////////////
-    // helper function //
-    /////////////////////
+    //////////////////////
+    // helper functions //
+    //////////////////////
 
     function createProject() public returns (CrowdfundingProject) {
         vm.prank(PROJECT_OWNER);
@@ -62,6 +87,37 @@ contract TestCrowdfunding is Test {
             DEADLINE_IN_DAYS,
             INVESTMENT_PERIOD_IN_DAYS
         );
+        return project;
+    }
+
+    function createProjectFullyFundItAndPerformUpkeep()
+        public
+        returns (CrowdfundingProject)
+    {
+        vm.prank(PROJECT_OWNER);
+        CrowdfundingProject project = crowdfunding.createProject{
+            value: initialFeesToBePaid
+        }(
+            PROJECT_NAME,
+            CROWDFUNDING_AMOUNT,
+            INTEREST_RATE,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            DEADLINE_IN_DAYS,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.warp(
+            block.timestamp +
+                (INVESTMENT_PERIOD_IN_DAYS * ONE_DAY_IN_SECONDS) +
+                1
+        );
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
         return project;
     }
 
@@ -155,6 +211,19 @@ contract TestCrowdfunding is Test {
         );
     }
 
+    function testRevertsIfNameOfTheProjectIsEmpty() public {
+        vm.expectRevert(Crowdfunding.Crowdfunding__NameCantBeEmpty.selector);
+        crowdfunding.createProject{value: initialFeesToBePaid}(
+            "",
+            CROWDFUNDING_AMOUNT,
+            INTEREST_RATE,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            DEADLINE_IN_DAYS,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+    }
+
     function testFuzz_RevertIfDeadlineIsLessThanMinimum(
         uint256 _amount
     ) public {
@@ -174,24 +243,6 @@ contract TestCrowdfunding is Test {
             amount,
             INVESTMENT_PERIOD_IN_DAYS
         );
-    }
-
-    function testRevertsIfNameOfTheProjectIsEmpty() public {
-        vm.expectRevert(Crowdfunding.Crowdfunding__NameCantBeEmpty.selector);
-        crowdfunding.createProject{value: initialFeesToBePaid}(
-            "",
-            CROWDFUNDING_AMOUNT,
-            INTEREST_RATE,
-            MIN_INVESTMENT,
-            MAX_INVESTMENT,
-            DEADLINE_IN_DAYS,
-            INVESTMENT_PERIOD_IN_DAYS
-        );
-    }
-
-    function testUpdatesTheProjectsStructWithCorrectData() public {
-        CrowdfundingProject project = createProject();
-        string memory projectName = crowdfunding.
     }
 
     function testCreatesANewCrowdfundingProjectWithCorrectParameters() public {
@@ -221,6 +272,154 @@ contract TestCrowdfunding is Test {
         assertEq(
             project.getCrowdfundingContractAddress(),
             address(crowdfunding)
+        );
+    }
+
+    function testUpdatesTheProjectsStructWithCorrectData() public {
+        createProject();
+
+        string memory projectName = crowdfunding.getProjectName(0);
+        uint256 crowdfundingAmount = crowdfunding.getCrowdfundingAmount(0);
+        uint256 interestRate = crowdfunding.getInterestRate(0);
+        uint256 minInvestment = crowdfunding.getMinInvestmentAmount(0);
+        uint256 maxInvestment = crowdfunding.getMaxInvestmentAmount(0);
+        uint256 deadline = crowdfunding.getDeadlineInDays(0);
+        uint256 investmentPeriod = crowdfunding.getInvestmentPeriodDays(0);
+        address owner = crowdfunding.getProjectOwner(0);
+        uint256[] memory projectIdBasedOnOwnerAddress = crowdfunding
+            .getProjectIdBasedOnOwnerAddress(PROJECT_OWNER);
+
+        assertEq(projectName, PROJECT_NAME);
+        assertEq(crowdfundingAmount, CROWDFUNDING_AMOUNT);
+        assertEq(interestRate, INTEREST_RATE);
+        assertEq(minInvestment, MIN_INVESTMENT);
+        assertEq(maxInvestment, MAX_INVESTMENT);
+        assertEq(deadline, DEADLINE_IN_DAYS);
+        assertEq(investmentPeriod, INVESTMENT_PERIOD_IN_DAYS);
+        assertEq(owner, PROJECT_OWNER);
+        assertEq(projectIdBasedOnOwnerAddress.length, 1);
+        assertEq(projectIdBasedOnOwnerAddress[0], 0);
+
+        createProject();
+
+        uint256[] memory projectIdsBasedOnOwnerAddress = crowdfunding
+            .getProjectIdBasedOnOwnerAddress(PROJECT_OWNER);
+
+        assertEq(projectIdsBasedOnOwnerAddress.length, 2);
+        assertEq(projectIdsBasedOnOwnerAddress[1], 1);
+    }
+
+    //////////////////////
+    // fundProject TEST //
+    //////////////////////
+    function testFuzz_RevertsIfTheProvidedIdDoesntExists(
+        uint256 _amount
+    ) public {
+        uint256 amount = bound(_amount, 1, type(uint256).max);
+        createProject();
+        vm.expectRevert();
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(amount);
+    }
+
+    function testRevertsIfTheAmountFundedIsZero() public {
+        createProject();
+        vm.expectRevert();
+        crowdfunding.fundProject{value: 0}(0);
+    }
+
+    function testShouldCallTheFundFunctionAndEmitAnEvent() public {
+        uint256 projectId = 0;
+        CrowdfundingProject project = createProject();
+        uint256 startingBalanceOfTheProject = address(project).balance;
+        assertEq(startingBalanceOfTheProject, initialFeesToBePaid);
+
+        vm.startPrank(INVESTOR);
+        vm.expectEmit(true, false, false, false);
+        emit ProjectFunded(
+            address(INVESTOR),
+            projectId,
+            CORRECT_INVESTMENT_AMOUNT
+        );
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(projectId);
+        uint256 endingBalanceOfTheProject = address(project).balance;
+        assertEq(
+            endingBalanceOfTheProject,
+            initialFeesToBePaid + CORRECT_INVESTMENT_AMOUNT
+        );
+        vm.stopPrank();
+    }
+
+    ///////////////////
+    // cancelProject //
+    ///////////////////
+    function testFuzz_RevertsIfTheProjectIdNotExists(uint256 _amount) public {
+        uint256 amount = bound(_amount, 1, type(uint256).max);
+        createProject();
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert();
+        crowdfunding.cancelProject(amount);
+    }
+
+    function testRevertsIfNotCalledByTheProjectOwner() public {
+        createProject();
+        vm.prank(PROJECT_OWNER2);
+        vm.expectRevert();
+        crowdfunding.cancelProject(0);
+    }
+
+    function testCancelsTheProjectAndPaysBackTheInvestorsAndOwnerAndEmitsAnEvent()
+        public
+    {
+        uint256 startingProjectOwnerBalance = PROJECT_OWNER.balance;
+        CrowdfundingProject project = createProject();
+        uint256 startingInvestorBalance = INVESTOR.balance;
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+
+        vm.expectEmit(true, false, false, false);
+        emit ProjectCanceled(PROJECT_OWNER, 0);
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.cancelProject(0);
+        uint256 endingInvestorBalance = INVESTOR.balance;
+        uint256 endingProjectOwnerBalance = PROJECT_OWNER.balance;
+
+        assertEq(address(project).balance, 0);
+        assertEq(endingInvestorBalance, startingInvestorBalance);
+        // on real test net the project owner should get back (initialFees - fees payed for paying back investors)
+        assertEq(endingProjectOwnerBalance, startingProjectOwnerBalance);
+    }
+
+    ///////////////////////////
+    // ownerFundProject TEST //
+    ///////////////////////////
+    function testRevertsIfFundNotCalledByTheProjectOwner() public {
+        uint256 fundAmount = 5 ether;
+        createProject();
+        vm.prank(PROJECT_OWNER2);
+        vm.expectRevert();
+        crowdfunding.ownerFundProject{value: fundAmount}(0);
+    }
+
+    function testRevertsIfTheAmountSentIsZero() public {
+        createProject();
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert();
+        crowdfunding.ownerFundProject{value: 0}(0);
+    }
+
+    function testShoudFundTheProjectContractWithFundedAmount() public {
+        uint256 fundAmount = 5 ether;
+        uint256 projectId = 0;
+        CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeep();
+        uint256 startingBalanceOfTheProject = address(project).balance;
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.ownerFundProject{value: fundAmount}(projectId);
+        uint256 endingBalanceOfTheProject = address(project).balance;
+
+        assertEq(
+            endingBalanceOfTheProject,
+            startingBalanceOfTheProject + fundAmount
         );
     }
 }
