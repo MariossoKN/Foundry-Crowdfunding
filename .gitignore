@@ -12,3 +12,8 @@ docs/
 
 # Dotenv file
 .env
+
+# my
+CrowdfundingProject.json
+deployment_output.json
+MyContractABI.json

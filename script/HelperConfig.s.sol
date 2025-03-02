@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.18;
 
 import {Crowdfunding} from "../src/Crowdfunding.sol";
 import {CrowdfundingProject} from "../src/CrowdfundingProject.sol";
@@ -29,7 +29,7 @@ contract HelperConfig is Script {
 
     function getMainNetEthConfig() public view returns (NetworkConfig memory) {
         NetworkConfig memory mainNetNetworkConfig = NetworkConfig({
-            crowdfundFeeInPrecent: 50000000000000000, // 0.05%
+            crowdfundFeeInPrecent: 500000000000000, // 0.05%
             minDeadlineInDays: 15,
             deployerKey: vm.envUint("PRIVATE_KEY")
         });
@@ -38,8 +38,8 @@ contract HelperConfig is Script {
 
     function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
         NetworkConfig memory sepoliaNetworkConfig = NetworkConfig({
-            crowdfundFeeInPrecent: 50000000000000000, // 0.05%
-            minDeadlineInDays: 15,
+            crowdfundFeeInPrecent: 500000000000000, // 0.05%
+            minDeadlineInDays: 2,
             deployerKey: vm.envUint("PRIVATE_KEY")
         });
         return sepoliaNetworkConfig;
@@ -47,7 +47,7 @@ contract HelperConfig is Script {
 
     function getAnvilEthConfig() public pure returns (NetworkConfig memory) {
         NetworkConfig memory anvilNetworkConfig = NetworkConfig({
-            crowdfundFeeInPrecent: 50000000000000000, // 0.05%
+            crowdfundFeeInPrecent: 500000000000000, // 0.05%
             minDeadlineInDays: 15,
             deployerKey: DEFAULT_ANVIL_PRIVATE_KEY
         });

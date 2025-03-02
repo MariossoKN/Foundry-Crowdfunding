@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.18;
 
@@ -95,6 +95,7 @@ contract Crowdfunding {
     ) external payable returns (CrowdfundingProject) {
         uint256 initialFees = calculateInitialFee(_crowdfundedAmount);
         // q should there be a chek for min. msg.value, so if the project is canceled the investors pay back doesnt fail
+        // if (10000000000000000 != 0.01)
         if (msg.value != initialFees) {
             revert Crowdfunding__YouHaveToSendTheExactAmountForInitialFees(
                 initialFees
@@ -211,14 +212,12 @@ contract Crowdfunding {
     }
 
     // calculates the initial fees paid by project owner
-    // 1500000000000000000000 (1500 ETH) * 50000000000000000 (0.05%) / 1e18 = 75000000000000000000
-    // 75000000000000000000 / 100
-    // 750000000000000000 (0,75 ETH) which is 0,05% from 1500 ETH
+    // 150000000000000000000 (150ETH) * 500000000000000 (0.05%) = 7500000000000000000000000000000000000 = 0.075
     function calculateInitialFee(
         uint256 _maxCrowdfundingAmount
     ) public view returns (uint256) {
         uint256 initialFees = ((_maxCrowdfundingAmount *
-            i_crowfundFeeInPercent) / 1e18) / 100;
+            i_crowfundFeeInPercent) / 1e18);
         return initialFees;
     }
 

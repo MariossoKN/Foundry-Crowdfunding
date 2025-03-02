@@ -8,6 +8,7 @@ import {DeployCrowdfunding} from "../script/DeployCrowdfunding.s.sol";
 import {HelperConfig} from "../script/HelperConfig.s.sol";
 import {Vm} from "../../lib/forge-std/src/Vm.sol";
 import {Test, console} from "../../lib/forge-std/src/Test.sol";
+import "forge-std/console.sol";
 
 contract TestCrowdfunding is Test {
     event ProjectCreated(
@@ -106,6 +107,7 @@ contract TestCrowdfunding is Test {
             DEADLINE_IN_DAYS,
             INVESTMENT_PERIOD_IN_DAYS
         );
+
         vm.prank(INVESTOR);
         crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
         crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
@@ -421,5 +423,63 @@ contract TestCrowdfunding is Test {
             endingBalanceOfTheProject,
             startingBalanceOfTheProject + fundAmount
         );
+    }
+
+    ////////////////////////
+    // finishProject TEST //
+    ////////////////////////
+
+    ///////////////////////
+    // withdrawFees TEST //
+    ///////////////////////
+
+    //////////////////////////////
+    // calculateInitialFee TEST //
+    //////////////////////////////
+
+    function testFuzz_CalculatedInitialFeesShouldBeTheSameAsExpectedFees(
+        uint256 _amount
+    ) public {
+        uint256 crowdfundingAmount = bound(_amount, 1 ether, 5000 ether);
+
+        uint256 expectedFee = (crowdfundingAmount * 500000000000000) / 1e18;
+
+        uint256 actualFee = crowdfunding.calculateInitialFee(
+            crowdfundingAmount
+        );
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.createProject{value: expectedFee}(
+            PROJECT_NAME,
+            crowdfundingAmount,
+            INTEREST_RATE,
+            crowdfundingAmount / 2,
+            crowdfundingAmount - 1,
+            DEADLINE_IN_DAYS,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+
+        assertEq(expectedFee, actualFee);
+    }
+
+    function testCalculateInitialFees() public {
+        uint256 expectedValueSentInWei = (CROWDFUNDING_AMOUNT *
+            500000000000000) / 1e18;
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.createProject{value: expectedValueSentInWei}(
+            PROJECT_NAME,
+            CROWDFUNDING_AMOUNT,
+            INTEREST_RATE,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            DEADLINE_IN_DAYS,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+
+        initialFeesToBePaid = crowdfunding.calculateInitialFee(
+            CROWDFUNDING_AMOUNT
+        );
+        assertEq(initialFeesToBePaid, expectedValueSentInWei);
     }
 }
