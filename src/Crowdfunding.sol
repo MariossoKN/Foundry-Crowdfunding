@@ -28,6 +28,11 @@ contract Crowdfunding {
         uint256 indexed _projectIndex
     );
 
+    event ProjectFundedOwner(
+        address indexed _owner,
+        uint256 indexed _projectIndex
+    );
+
     modifier onlyProjectOwner(uint256 _projectId) {
         address owner = s_crowdfundingProjectArray[_projectId].owner;
         if (msg.sender != owner) {
@@ -95,7 +100,6 @@ contract Crowdfunding {
     ) external payable returns (CrowdfundingProject) {
         uint256 initialFees = calculateInitialFee(_crowdfundedAmount);
         // q should there be a chek for min. msg.value, so if the project is canceled the investors pay back doesnt fail
-        // if (10000000000000000 != 0.01)
         if (msg.value != initialFees) {
             revert Crowdfunding__YouHaveToSendTheExactAmountForInitialFees(
                 initialFees
@@ -182,6 +186,7 @@ contract Crowdfunding {
             _projectId
         ].projectContract;
         projectContract.ownerFund{value: msg.value}();
+        emit ProjectFundedOwner(msg.sender, _projectId);
     }
 
     // ??? add a function to pay out a single investor ??? just in case the finish function doest work properly

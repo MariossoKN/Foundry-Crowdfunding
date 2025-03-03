@@ -28,6 +28,11 @@ contract TestCrowdfunding is Test {
         uint256 indexed _projectIndex
     );
 
+    event ProjectFundedOwner(
+        address indexed _owner,
+        uint256 indexed _projectIndex
+    );
+
     Crowdfunding public crowdfunding;
     HelperConfig public helperConfig;
 
@@ -311,6 +316,50 @@ contract TestCrowdfunding is Test {
         assertEq(projectIdsBasedOnOwnerAddress[1], 1);
     }
 
+    function testShouldCreateAProjectsAndEmitEvent() public {
+        uint256 projectId = 0;
+        uint256 projectTwoId = 1;
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectEmit(true, true, true, false);
+        emit ProjectCreated(
+            address(PROJECT_OWNER),
+            CrowdfundingProject(0xa16E02E87b7454126E5E10d957A927A7F5B5d2be),
+            projectId
+        );
+
+        crowdfunding.createProject{value: initialFeesToBePaid}(
+            PROJECT_NAME,
+            CROWDFUNDING_AMOUNT,
+            INTEREST_RATE,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            DEADLINE_IN_DAYS,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+        vm.stopPrank();
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectEmit(true, true, true, false);
+        emit ProjectCreated(
+            address(PROJECT_OWNER),
+            CrowdfundingProject(0xB7A5bd0345EF1Cc5E66bf61BdeC17D2461fBd968),
+            projectTwoId
+        );
+
+        crowdfunding.createProject{value: initialFeesToBePaid}(
+            PROJECT_NAME,
+            CROWDFUNDING_AMOUNT,
+            INTEREST_RATE,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            DEADLINE_IN_DAYS,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+
+        vm.stopPrank();
+    }
+
     //////////////////////
     // fundProject TEST //
     //////////////////////
@@ -329,14 +378,14 @@ contract TestCrowdfunding is Test {
         crowdfunding.fundProject{value: 0}(0);
     }
 
-    function testShouldCallTheFundFunctionAndEmitAnEvent() public {
+    function testShouldFundToTheContractAndEmitAnEvent() public {
         uint256 projectId = 0;
         CrowdfundingProject project = createProject();
         uint256 startingBalanceOfTheProject = address(project).balance;
         assertEq(startingBalanceOfTheProject, initialFeesToBePaid);
 
         vm.startPrank(INVESTOR);
-        vm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, true, true, false);
         emit ProjectFunded(
             address(INVESTOR),
             projectId,
@@ -378,7 +427,7 @@ contract TestCrowdfunding is Test {
         vm.prank(INVESTOR);
         crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
 
-        vm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, true, false, false);
         emit ProjectCanceled(PROJECT_OWNER, 0);
         vm.prank(PROJECT_OWNER);
         crowdfunding.cancelProject(0);
@@ -409,13 +458,17 @@ contract TestCrowdfunding is Test {
         crowdfunding.ownerFundProject{value: 0}(0);
     }
 
-    function testShoudFundTheProjectContractWithFundedAmount() public {
+    function testShoudFundTheProjectContractWithFundedAmountAndEmitAnEvent()
+        public
+    {
         uint256 fundAmount = 5 ether;
         uint256 projectId = 0;
         CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeep();
         uint256 startingBalanceOfTheProject = address(project).balance;
 
         vm.prank(PROJECT_OWNER);
+        vm.expectEmit(true, true, false, false);
+        emit ProjectFundedOwner(PROJECT_OWNER, 0);
         crowdfunding.ownerFundProject{value: fundAmount}(projectId);
         uint256 endingBalanceOfTheProject = address(project).balance;
 

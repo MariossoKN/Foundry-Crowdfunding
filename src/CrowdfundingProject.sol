@@ -98,7 +98,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
 
     // fund the project
     function fund(address _investor) external payable onlyCrowdfundingContract {
-        // do we need to prevent the investor to fund again? I think we have to otherwise the amountToBePaid will be wrongly calculated.. have to test it !!!
+        // do we need to prevent the investor to fund again? May the amountToBePaid be wrongly calculated? have to test it !!!
         if (s_projectState != ProjectState.FUNDING_ACTIVE) {
             revert CrowdfundingProject__FundingIsNotActive();
         }
@@ -127,16 +127,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         s_currentFundedAmount += msg.value;
     }
 
-    // calculates how much the investor should get (based on the investment amount and interest rate) if the project is fully funded
-    function calculateAmountToBePaidToInvestor(
-        uint256 _amountInvested,
-        uint256 _interestRateInPercent
-    ) public pure returns (uint256) {
-        return
-            _amountInvested +
-            ((_amountInvested * _interestRateInPercent) / 100);
-    }
-
     // Chainlink automation to check if the project is fully funded after the time interval
     function checkUpkeep(
         bytes memory /* checkData */
@@ -162,7 +152,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         ) {
             if (s_currentFundedAmount < i_maxCrowdfundingAmount) {
                 s_projectState = ProjectState.CLOSED;
-                payBackInvestorsAndOwner();
+                payBackAmountInvestedAndOwner();
             } else {
                 s_projectInvestmentIntervalStart = block.timestamp;
                 s_projectState = ProjectState.INVESTING_ACTIVE;
@@ -173,28 +163,66 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
 
     // pays back the investors and cancels the project
     function cancel() external onlyCrowdfundingContract {
+        if (s_projectState != ProjectState.FUNDING_ACTIVE) {
+            revert CrowdfundingProject__FundingIsNotActive();
+        }
         s_projectState = ProjectState.CANCELED;
-        payBackInvestorsAndOwner();
+        payBackAmountInvestedAndOwner();
     }
 
-    // pays back the investors and project owner; resets the investors array
-    function payBackInvestorsAndOwner() internal {
-        if (s_projectState == ProjectState.INVESTING_ACTIVE) {
-            revert CrowdfundingProject__InvestorsCantBePaidBackIfTheProjectIsActive();
-        }
+    // pays back the investors and project owner; resets the investors array. Only used when the project is canceled/closed
+    function payBackAmountInvestedAndOwner() internal {
         Investor[] memory temporaryInvestors = s_investors;
         // delete state variable due to possible Reentrancy attack
         delete s_investors;
         for (uint256 i = 0; i < temporaryInvestors.length; i++) {
-            uint256 amountInvested = temporaryInvestors[i].amountInvested;
-            (bool success, ) = (temporaryInvestors[i].investor).call{
-                value: amountInvested
-            }("");
-            require(success, "Investors pay back failed");
+            if (temporaryInvestors[i].paidOut == false) {
+                s_investors[i].amountToBePaidOut = 0;
+                s_investors[i].paidOut = true;
+                uint256 amountInvested = temporaryInvestors[i].amountInvested;
+                (bool success, ) = (temporaryInvestors[i].investor).call{
+                    value: amountInvested
+                }("");
+                require(success, "Investors pay back failed");
+            }
         }
         // pay back the rest of initial fees to the owner
         (bool success2, ) = (i_owner).call{value: address(this).balance}("");
         require(success2, "Owner pay back failed");
+    }
+
+    // pays back one investor
+    function payBackAmountInvestedToOneInvestor(
+        address _investorsAddress
+    ) external payable onlyCrowdfundingContract {
+        if (s_projectState == ProjectState.INVESTING_ACTIVE) {
+            revert CrowdfundingProject__InvestorsCantBePaidBackIfTheProjectIsActive();
+        }
+        Investor[] memory temporaryInvestors = s_investors;
+        for (uint256 i = 0; i < temporaryInvestors.length; i++) {
+            if (temporaryInvestors[i].investor == _investorsAddress) {
+                if (temporaryInvestors[i].paidOut == false) {
+                    uint256 amountInvested = temporaryInvestors[i]
+                        .amountInvested;
+                    s_investors[i].amountToBePaidOut = 0;
+                    s_investors[i].paidOut = true;
+                    (bool success, ) = (temporaryInvestors[i].investor).call{
+                        value: amountInvested
+                    }("");
+                    require(success, "Investor pay back failed");
+                }
+            }
+        }
+    }
+
+    function payBackOwner() external payable onlyCrowdfundingContract {
+        uint256 investorsToBePaidOut = getInvestorsToBePaidOut();
+        if (investorsToBePaidOut == 0) {
+            (bool success2, ) = (i_owner).call{value: address(this).balance}(
+                ""
+            );
+            require(success2, "Owner pay back failed");
+        }
     }
 
     function ownerFund() external payable onlyCrowdfundingContract {
@@ -203,7 +231,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         }
     }
 
-    // withdraws the crowdfunded amount to project owner and the initial fees to crowdfunding contract
+    // withdraws the crowdfunded amount to project owner and sends the initial fees to crowdfunding contract
     function withdrawFunds() internal {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
             revert CrowdfundingProject__InvestingIsNotActive();
@@ -228,6 +256,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         }
         s_projectState = ProjectState.FINISHED;
         Investor[] memory temporaryInvestors = s_investors;
+        delete s_investors;
         for (uint256 i = 0; i < temporaryInvestors.length; i++) {
             if (temporaryInvestors[i].paidOut == false) {
                 uint256 amountToPayOut = temporaryInvestors[i]
@@ -244,6 +273,16 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         require(success2, "Owner withdraw failed");
     }
 
+    // calculates how much the investor should get (based on the investment amount and interest rate) if the project is fully funded
+    function calculateAmountToBePaidToInvestor(
+        uint256 _amountInvested,
+        uint256 _interestRateInPercent
+    ) public pure returns (uint256) {
+        return
+            _amountInvested +
+            ((_amountInvested * _interestRateInPercent) / 100);
+    }
+
     function calculateFullAmountToBePaidOutToInvestorsWithoutGasFees()
         public
         view
@@ -257,6 +296,17 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
             }
         }
         return fullAmountToBePaid;
+    }
+
+    function getInvestorsToBePaidOut() public view returns (uint256) {
+        uint256 investorsToBePaidOut = 0;
+        Investor[] memory temporaryInvestors = s_investors;
+        for (uint256 i = 0; i < temporaryInvestors.length; i++) {
+            if (temporaryInvestors[i].paidOut == false) {
+                investorsToBePaidOut++;
+            }
+        }
+        return investorsToBePaidOut;
     }
 
     function getRemainingFundingAmount() public view returns (uint256) {
@@ -317,19 +367,19 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         return s_investors[_index].investor;
     }
 
-    function getInvestorsInvestmentAmount(
+    function getInvestorInvestmentAmount(
         uint256 _index
     ) external view returns (uint256) {
         return s_investors[_index].amountInvested;
     }
 
-    function getInvestorsAmountToBePaidOut(
+    function getInvestorAmountToBePaidOut(
         uint256 _index
     ) external view returns (uint256) {
         return s_investors[_index].amountToBePaidOut;
     }
 
-    function getInvestorsPaidOutStatus(
+    function getInvestorPaidOutStatus(
         uint256 _index
     ) external view returns (bool) {
         return s_investors[_index].paidOut;

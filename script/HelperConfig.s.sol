@@ -29,7 +29,7 @@ contract HelperConfig is Script {
 
     function getMainNetEthConfig() public view returns (NetworkConfig memory) {
         NetworkConfig memory mainNetNetworkConfig = NetworkConfig({
-            crowdfundFeeInPrecent: 500000000000000, // 0.05%
+            crowdfundFeeInPrecent: 500000000000000, // 0.05% (0.0005 decimal)
             minDeadlineInDays: 15,
             deployerKey: vm.envUint("PRIVATE_KEY")
         });
@@ -38,7 +38,7 @@ contract HelperConfig is Script {
 
     function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
         NetworkConfig memory sepoliaNetworkConfig = NetworkConfig({
-            crowdfundFeeInPrecent: 500000000000000, // 0.05%
+            crowdfundFeeInPrecent: 500000000000000, // 0.05% (0.0005 decimal)
             minDeadlineInDays: 2,
             deployerKey: vm.envUint("PRIVATE_KEY")
         });
@@ -47,7 +47,7 @@ contract HelperConfig is Script {
 
     function getAnvilEthConfig() public pure returns (NetworkConfig memory) {
         NetworkConfig memory anvilNetworkConfig = NetworkConfig({
-            crowdfundFeeInPrecent: 500000000000000, // 0.05%
+            crowdfundFeeInPrecent: 500000000000000, // 0.05% (0.0005 decimal)
             minDeadlineInDays: 15,
             deployerKey: DEFAULT_ANVIL_PRIVATE_KEY
         });
