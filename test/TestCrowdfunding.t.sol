@@ -8,7 +8,7 @@ import {DeployCrowdfunding} from "../script/DeployCrowdfunding.s.sol";
 import {HelperConfig} from "../script/HelperConfig.s.sol";
 import {Vm} from "../../lib/forge-std/src/Vm.sol";
 import {Test, console} from "../../lib/forge-std/src/Test.sol";
-import "forge-std/console.sol";
+import {console} from "forge-std/console.sol";
 
 contract TestCrowdfunding is Test {
     event ProjectCreated(
@@ -46,6 +46,7 @@ contract TestCrowdfunding is Test {
     address PROJECT_OWNER2 = makeAddr("projectOwner2");
     address INVESTOR = makeAddr("investor");
     address INVESTOR2 = makeAddr("investor2");
+    address INVESTOR3 = makeAddr("investor3");
     uint256 STARTING_BALANCE = 100 ether;
 
     string PROJECT_NAME = "Grand Resort Crowdfund Project";
@@ -70,10 +71,11 @@ contract TestCrowdfunding is Test {
             CROWDFUNDING_AMOUNT
         );
 
-        vm.deal(PROJECT_OWNER, STARTING_BALANCE);
-        vm.deal(PROJECT_OWNER2, STARTING_BALANCE);
+        vm.deal(PROJECT_OWNER, STARTING_BALANCE * 5);
+        vm.deal(PROJECT_OWNER2, STARTING_BALANCE * 5);
         vm.deal(INVESTOR, STARTING_BALANCE);
         vm.deal(INVESTOR2, STARTING_BALANCE);
+        vm.deal(INVESTOR3, STARTING_BALANCE);
     }
 
     //////////////////////
@@ -115,9 +117,11 @@ contract TestCrowdfunding is Test {
 
         vm.prank(INVESTOR);
         crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
-        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
         vm.prank(INVESTOR2);
         crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+
         vm.warp(
             block.timestamp +
                 (INVESTMENT_PERIOD_IN_DAYS * ONE_DAY_IN_SECONDS) +
@@ -481,6 +485,53 @@ contract TestCrowdfunding is Test {
     ////////////////////////
     // finishProject TEST //
     ////////////////////////
+    function testShoulRevertIfNotCalledByOwner() public {
+        createProject();
+
+        vm.prank(PROJECT_OWNER2);
+        vm.expectRevert();
+        crowdfunding.finishProject(0);
+
+        vm.prank(INVESTOR);
+        vm.expectRevert();
+        crowdfunding.finishProject(0);
+    }
+
+    function testShouldRevertIfTheContractBalanceIsNotEnoughForPayingOutAllInvestors()
+        public
+    {
+        createProjectFullyFundItAndPerformUpkeep();
+        vm.prank(PROJECT_OWNER);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Crowdfunding
+                    .Crowdfunding__NotEnoughEthInTheProjectContract
+                    .selector
+            )
+        );
+        crowdfunding.finishProject(0);
+    }
+
+    function testShouldFinishTheProjectAndPayOutInvestorsAndOwner() public {
+        uint256 projectId = 0;
+        CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeep();
+
+        uint256 balanceOfTheProjectBefore = address(project).balance;
+        assertEq(balanceOfTheProjectBefore, 0);
+
+        uint256 expectedMinBalance = crowdfunding
+            .getFullAmountToBePaidOutToInvestorsWithoutGasFees(projectId);
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.ownerFundProject{value: expectedMinBalance * 2}(projectId);
+        uint256 balanceOfTheProjectAfter = address(project).balance;
+        assertEq(balanceOfTheProjectAfter, expectedMinBalance * 2);
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.finishProject(projectId);
+        // crowdfunding.payOutInvestmentAndInterestToInvestor(0, INVESTOR2);
+    }
 
     ///////////////////////
     // withdrawFees TEST //
