@@ -13,11 +13,11 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         uint256
     );
     error CrowdfundingProject__FundingIsNotActive();
+    error CrowdfundingProject__InvestingIsNotActive();
     error CrowdfundingProject__CanOnlyBeCalledByTheCrowdfundingContract();
     error CrowdfundingProject__ContractHasLessEthThenNeededToPayOutAllInvestors(
         uint256
     );
-    error CrowdfundingProject__InvestingIsNotActive();
     error CrowdfundingProject__UpkeepNotNeeded();
     error CrowdfundingProject__NoFundsToWithdraw();
 
@@ -202,6 +202,14 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
             amountInvestedOfAllInvestors);
     }
 
+    // lets the investors and owner withdraw if the project was CANCELED, CLOSED or FINISHED
+    function withdrawPayOuts() external payable {
+        uint256 amountToPayOut = s_amountToBePaidOut[msg.sender];
+
+        (bool success, ) = payable(msg.sender).call{value: amountToPayOut}("");
+        require(success, "Withdraw failed");
+    }
+
     // withdraws the crowdfunded amount to project owner and sends the initial fees to crowdfunding contract
     function withdrawFunds() internal {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
@@ -231,7 +239,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
             revert CrowdfundingProject__InvestingIsNotActive();
         }
         uint256 contractBalance = address(this).balance;
-        uint256 amountNeeded = getFullAmountToBePaidOutToInvestorsWithoutGasFees();
+        uint256 amountNeeded = getInvestedPlusInteresToAllInvestorsWithoutGasFees();
         if (contractBalance < amountNeeded) {
             revert CrowdfundingProject__ContractHasLessEthThenNeededToPayOutAllInvestors(
                 amountNeeded
@@ -267,7 +275,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         return amountToBePaidOut;
     }
 
-    function getFullAmountToBePaidOutToInvestorsWithoutGasFees()
+    function getInvestedPlusInteresToAllInvestorsWithoutGasFees()
         public
         view
         returns (uint256)
@@ -356,7 +364,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         return s_investors[_index].paidOut;
     }
 
-    function getInvestorAmountToBePaidOut(
+    function getInvestedPlusInterest(
         address _investorAddress
     ) external view returns (uint256) {
         Investor[] memory temporaryInvestors = s_investors;

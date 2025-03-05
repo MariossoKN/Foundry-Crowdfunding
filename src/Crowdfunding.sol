@@ -197,7 +197,7 @@ contract Crowdfunding {
             _projectId
         ].projectContract;
         if (
-            getFullAmountToBePaidOutToInvestorsWithoutGasFees(_projectId) >=
+            getInvestedPlusInterestToAllInvestorsWithoutGasFees(_projectId) >=
             address(projectContract).balance
         ) {
             revert Crowdfunding__NotEnoughEthInTheProjectContract();
@@ -325,12 +325,12 @@ contract Crowdfunding {
                 .getCurrentFundedAmount();
     }
 
-    function getFullAmountToBePaidOutToInvestorsWithoutGasFees(
+    function getInvestedPlusInterestToAllInvestorsWithoutGasFees(
         uint256 _projectId
     ) public view returns (uint256) {
         return
             (s_crowdfundingProjectArray[_projectId].projectContract)
-                .getFullAmountToBePaidOutToInvestorsWithoutGasFees();
+                .getInvestedPlusInteresToAllInvestorsWithoutGasFees();
     }
 
     function getRemainingFundAmount(
