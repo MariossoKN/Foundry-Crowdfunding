@@ -331,30 +331,6 @@ contract Crowdfunding {
         return i_owner;
     }
 
-    function getProjectStatus(
-        uint256 _projectId
-    ) external view returns (CrowdfundingProject.ProjectState) {
-        return
-            (s_crowdfundingProjectArray[_projectId].projectContract)
-                .getProjectStatus();
-    }
-
-    function getProjectCurrentFundedAmount(
-        uint256 _projectId
-    ) external view returns (uint256) {
-        return
-            (s_crowdfundingProjectArray[_projectId].projectContract)
-                .getCurrentFundedAmount();
-    }
-
-    function getRemainingFundAmount(
-        uint256 _projectId
-    ) external view returns (uint256) {
-        return
-            (s_crowdfundingProjectArray[_projectId].projectContract)
-                .getRemainingFundingAmount();
-    }
-
     //////////////////////
     // FALLBACK RECEIVE //
     //////////////////////
