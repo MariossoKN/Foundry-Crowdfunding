@@ -131,6 +131,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
             false
         );
         s_amountToBePaidOut[_investor] = amountToBePaid;
+        s_currentFundedAmount += msg.value;
     }
 
     // Chainlink automation to check if the project is fully funded after the time interval
@@ -180,7 +181,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
     function payBackAmountInvestedAndOwner() internal {
         Investor[] memory temporaryInvestors = s_investors;
         // delete state variable due to possible Reentrancy attack
-        delete s_investors;
+        // delete s_investors;
         for (uint256 i = 0; i < temporaryInvestors.length; i++) {
             if (temporaryInvestors[i].paidOut == false) {
                 s_investors[i].amountToBePaidOut = 0;
