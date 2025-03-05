@@ -151,6 +151,9 @@ contract Crowdfunding {
      */
     // q what happens if for example the project has a minInvestment of 1 ether, but the project only needs 0,5 ether to be fully funded??
     function fundProject(uint256 _projectId) external payable {
+        if (msg.value == 0) {
+            revert Crowdfunding__ValueSentCantBeZero();
+        }
         CrowdfundingProject projectContract = s_crowdfundingProjectArray[
             _projectId
         ].projectContract;
@@ -224,56 +227,71 @@ contract Crowdfunding {
         return initialFees;
     }
 
-    //////////////////////
-    // Getter Functions //
-    //////////////////////
+    ///////////////////////////
+    // PUBLIC VIEW FUNCTIONS //
+    ///////////////////////////
+    function getInvestedPlusInterestToAllInvestorsWithoutGasFees(
+        uint256 _projectId
+    ) public view returns (uint256) {
+        return
+            (s_crowdfundingProjectArray[_projectId].projectContract)
+                .getInvestedPlusInteresOfAllInvestorsWithoutGasFees();
+    }
+
+    /////////////////////////////
+    // EXTERNAL VIEW FUNCTIONS //
+    /////////////////////////////
     function getProjectName(
         uint256 _projectId
-    ) public view returns (string memory) {
+    ) external view returns (string memory) {
         return s_crowdfundingProjectArray[_projectId].name;
     }
 
     function getCrowdfundingAmount(
         uint256 _projectId
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return s_crowdfundingProjectArray[_projectId].crowdfundedAmount;
     }
 
-    function getInterestRate(uint256 _projectId) public view returns (uint256) {
+    function getInterestRate(
+        uint256 _projectId
+    ) external view returns (uint256) {
         return s_crowdfundingProjectArray[_projectId].interestRateInPercent;
     }
 
     function getMinInvestmentAmount(
         uint256 _projectId
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return s_crowdfundingProjectArray[_projectId].minInvestment;
     }
 
     function getMaxInvestmentAmount(
         uint256 _projectId
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return s_crowdfundingProjectArray[_projectId].maxInvestment;
     }
 
     function getDeadlineInDays(
         uint256 _projectId
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return s_crowdfundingProjectArray[_projectId].deadlineInDays;
     }
 
     function getInvestmentPeriodDays(
         uint256 _projectId
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return s_crowdfundingProjectArray[_projectId].investmentPeriodDays;
     }
 
-    function getProjectOwner(uint256 _projectId) public view returns (address) {
+    function getProjectOwner(
+        uint256 _projectId
+    ) external view returns (address) {
         return s_crowdfundingProjectArray[_projectId].owner;
     }
 
     function getProjectIdBasedOnOwnerAddress(
         address _owner
-    ) public view returns (uint256[] memory) {
+    ) external view returns (uint256[] memory) {
         uint256 arrayLength = s_crowdfundingProjectArray.length;
         uint256[] memory projectIds = new uint256[](arrayLength); // Preallocate memory
         uint256 count = 0;
@@ -293,25 +311,29 @@ contract Crowdfunding {
 
     function getInitialFees(
         uint256 _maxCrowdfundingAmount
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return calculateInitialFee(_maxCrowdfundingAmount);
     }
 
-    function getCrowdfundingFeeInPercent() public view returns (uint256) {
+    function getCrowdfundingFeeInPercent() external view returns (uint256) {
         return i_crowfundFeeInPercent;
     }
 
-    function getMinDeadlineInDays() public view returns (uint256) {
+    function getMinDeadlineInDays() external view returns (uint256) {
         return i_minDeadlineInDays;
     }
 
-    function getProjectsCount() public view returns (uint256) {
+    function getProjectsCount() external view returns (uint256) {
         return s_crowdfundingProjectArray.length;
+    }
+
+    function getCwOwner() external view returns (address) {
+        return i_owner;
     }
 
     function getProjectStatus(
         uint256 _projectId
-    ) public view returns (CrowdfundingProject.ProjectState) {
+    ) external view returns (CrowdfundingProject.ProjectState) {
         return
             (s_crowdfundingProjectArray[_projectId].projectContract)
                 .getProjectStatus();
@@ -319,28 +341,23 @@ contract Crowdfunding {
 
     function getProjectCurrentFundedAmount(
         uint256 _projectId
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return
             (s_crowdfundingProjectArray[_projectId].projectContract)
                 .getCurrentFundedAmount();
     }
 
-    function getInvestedPlusInterestToAllInvestorsWithoutGasFees(
-        uint256 _projectId
-    ) public view returns (uint256) {
-        return
-            (s_crowdfundingProjectArray[_projectId].projectContract)
-                .getInvestedPlusInteresToAllInvestorsWithoutGasFees();
-    }
-
     function getRemainingFundAmount(
         uint256 _projectId
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return
             (s_crowdfundingProjectArray[_projectId].projectContract)
                 .getRemainingFundingAmount();
     }
 
+    //////////////////////
+    // FALLBACK RECEIVE //
+    //////////////////////
     fallback() external {}
 
     receive() external payable {}

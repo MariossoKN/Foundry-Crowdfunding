@@ -7,7 +7,7 @@ import {AutomationBase, AutomationCompatibleInterface} from "@chainlink/contract
 contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
     error CrowdfundingProject__NotEnoughEthSent();
     error CrowdfundingProject__TooMuchEthSent();
-    error CrowdfundingProject__MinInvestmentGreaterThanMaxInvestment();
+    error CrowdfundingProject__MinInvestmentGreaterOrEqualToMaxInvestment();
     error CrowdfundingProject__AmountCrowfundedCantBeLessThanMaxInvestment();
     error CrowdfundingProject__AmountEthSentIsGreaterThanTheRestCrowfundingNeeded(
         uint256
@@ -78,8 +78,8 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         if (_maxCrowfundingAmount < _maxInvestment) {
             revert CrowdfundingProject__AmountCrowfundedCantBeLessThanMaxInvestment();
         }
-        if (_minInvestment > _maxInvestment) {
-            revert CrowdfundingProject__MinInvestmentGreaterThanMaxInvestment();
+        if (_minInvestment >= _maxInvestment) {
+            revert CrowdfundingProject__MinInvestmentGreaterOrEqualToMaxInvestment();
         }
         s_projectName = _projectName;
         i_owner = _projectOwner;
@@ -210,7 +210,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         require(success, "Withdraw failed");
     }
 
-    // withdraws the crowdfunded amount to project owner and sends the initial fees to crowdfunding contract
+    // CALLED BY UPKEEP. withdraws the crowdfunded amount to project owner and sends the initial fees to crowdfunding contract
     function withdrawFunds() internal {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
             revert CrowdfundingProject__InvestingIsNotActive();
@@ -238,13 +238,13 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
             revert CrowdfundingProject__InvestingIsNotActive();
         }
-        uint256 contractBalance = address(this).balance;
-        uint256 amountNeeded = getInvestedPlusInteresToAllInvestorsWithoutGasFees();
-        if (contractBalance < amountNeeded) {
-            revert CrowdfundingProject__ContractHasLessEthThenNeededToPayOutAllInvestors(
-                amountNeeded
-            );
-        }
+        // uint256 contractBalance = address(this).balance;
+        // uint256 amountNeeded = getInvestedPlusInteresToAllInvestorsWithoutGasFees();
+        // if (contractBalance < amountNeeded) {
+        //     revert CrowdfundingProject__ContractHasLessEthThenNeededToPayOutAllInvestors(
+        //         amountNeeded
+        //     );
+        // }
 
         s_projectState = ProjectState.FINISHED;
         setPayOuts();
@@ -261,7 +261,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
     }
 
     ///////////////////////////
-    // PUBLIC VIEW FUNCTIONS //
+    // VIEW GETTER FUNCTIONS //
     ///////////////////////////
     function getInvestedAmountForAllInvestors() public view returns (uint256) {
         Investor[] memory temporaryInvestors = s_investors;
@@ -275,23 +275,33 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         return amountToBePaidOut;
     }
 
-    function getInvestedPlusInteresToAllInvestorsWithoutGasFees()
+    function getInvestedPlusInteresOfAllInvestorsWithoutGasFees()
         public
         view
         returns (uint256)
     {
         uint256 fullAmountToBePaid = 0;
         Investor[] memory temporaryInvestors = s_investors;
+
         for (uint256 i = 0; i < temporaryInvestors.length; i++) {
             if (temporaryInvestors[i].paidOut == false) {
-                address investorAddress = temporaryInvestors[i].investor;
-                uint256 amountToBepaidOut = s_amountToBePaidOut[
-                    investorAddress
-                ];
+                uint256 amountToBepaidOut = temporaryInvestors[i]
+                    .amountInvestedPlusInterest;
                 fullAmountToBePaid += amountToBepaidOut;
             }
         }
         return fullAmountToBePaid;
+    }
+
+    function getInvestor(
+        address _investorAddress
+    ) public view returns (Investor memory) {
+        Investor[] memory temporaryInvestors = s_investors;
+        for (uint256 i = 0; i < temporaryInvestors.length; i++) {
+            if (temporaryInvestors[i].investor == _investorAddress) {
+                return temporaryInvestors[i];
+            }
+        }
     }
 
     function getRemainingFundingAmount() public view returns (uint256) {
@@ -346,24 +356,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         return s_investors.length;
     }
 
-    function getInvestorAddress(
-        uint256 _index
-    ) external view returns (address) {
-        return s_investors[_index].investor;
-    }
-
-    function getInvestorInvestmentAmount(
-        uint256 _index
-    ) external view returns (uint256) {
-        return s_investors[_index].amountInvested;
-    }
-
-    function getInvestorPaidOutStatus(
-        uint256 _index
-    ) external view returns (bool) {
-        return s_investors[_index].paidOut;
-    }
-
     function getInvestedPlusInterest(
         address _investorAddress
     ) external view returns (uint256) {
@@ -374,6 +366,24 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
             }
         }
         return 0;
+    }
+
+    function getInvestorPaidOutStatus(
+        address _investorAddress
+    ) external view returns (bool) {
+        return getInvestor(_investorAddress).paidOut;
+    }
+
+    function getInvestorAddress(
+        address _investorAddress
+    ) external view returns (address) {
+        return getInvestor(_investorAddress).investor;
+    }
+
+    function getInvestorInvestmentAmount(
+        address _investorAddress
+    ) external view returns (uint256) {
+        return getInvestor(_investorAddress).amountInvested;
     }
 
     function getCrowdfundingContractAddress() external view returns (address) {
