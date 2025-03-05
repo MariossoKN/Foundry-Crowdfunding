@@ -189,19 +189,6 @@ contract Crowdfunding {
         emit ProjectFundedOwner(msg.sender, _projectId);
     }
 
-    // ??? add a function to pay out a single investor ??? just in case the finish function doest work properly
-    function payOutInvestmentAndInterestToInvestor(
-        uint256 _projectId,
-        address _investorAddress
-    ) external payable onlyProjectOwner(_projectId) {
-        CrowdfundingProject projectContract = s_crowdfundingProjectArray[
-            _projectId
-        ].projectContract;
-        projectContract.payOutInvestmentAndInterestToOneInvestor(
-            _investorAddress
-        );
-    }
-
     // lets the project owner to finish the project and pay out the investors; project owner has to first fund the project with the ownerFundProject function
     function finishProject(
         uint256 _projectId
@@ -240,7 +227,6 @@ contract Crowdfunding {
     //////////////////////
     // Getter Functions //
     //////////////////////
-
     function getProjectName(
         uint256 _projectId
     ) public view returns (string memory) {
@@ -344,7 +330,7 @@ contract Crowdfunding {
     ) public view returns (uint256) {
         return
             (s_crowdfundingProjectArray[_projectId].projectContract)
-                .calculateFullAmountToBePaidOutToInvestorsWithoutGasFees();
+                .getFullAmountToBePaidOutToInvestorsWithoutGasFees();
     }
 
     function getRemainingFundAmount(
