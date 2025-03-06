@@ -122,11 +122,7 @@ contract TestCrowdfunding is Test {
         vm.prank(INVESTOR3);
         crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
 
-        vm.warp(
-            block.timestamp +
-                (INVESTMENT_PERIOD_IN_DAYS * ONE_DAY_IN_SECONDS) +
-                1
-        );
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
         vm.roll(block.number + 1);
         project.performUpkeep("");
         return project;
