@@ -19,7 +19,9 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         uint256
     );
     error CrowdfundingProject__UpkeepNotNeeded();
-    error CrowdfundingProject__NoFundsToWithdraw();
+    error CrowdfundingProject__AlreadyWithdrawed();
+    error CrowdfundingProject__ProjectAlreadyCanceled();
+    error CrowdfundingProject__ProjectAlreadyFinished();
 
     modifier onlyCrowdfundingContract() {
         if (msg.sender != s_crowdfundingContractAddress) {
@@ -53,15 +55,14 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
     }
 
     struct Investor {
-        address payable investor;
         uint256 amountInvested;
         uint256 amountInvestedPlusInterest;
+        uint256 amountToPayOut;
         bool paidOut;
     }
 
-    Investor[] private s_investors;
-    mapping(address investorAddress => uint256 amountToBePaidOut)
-        private s_amountToBePaidOut;
+    mapping(address investorAddress => Investor investor) private s_investor;
+    address[] s_investors;
 
     // creates the project with information given by project owner
     constructor(
@@ -96,7 +97,9 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
     }
 
     // fund the project
-    function fund(address _investor) external payable onlyCrowdfundingContract {
+    function fund(
+        address _investorAddress
+    ) external payable onlyCrowdfundingContract {
         if (s_projectState != ProjectState.FUNDING_ACTIVE) {
             revert CrowdfundingProject__FundingIsNotActive();
         }
@@ -112,17 +115,36 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
                 remainingFundingAmount
             );
         }
+
         uint256 amountInvestedPlusInterest = calculateInvestedPlusInterest(
             msg.value,
             i_interestRateInPercent
         );
-        s_investors.push() = Investor(
-            payable(_investor),
-            msg.value,
-            amountInvestedPlusInterest,
-            false
-        );
-        s_currentFundedAmount += msg.value;
+
+        uint256 amountAlreadyInvested = s_investor[_investorAddress]
+            .amountInvested;
+
+        if (amountAlreadyInvested == 0) {
+            s_investor[_investorAddress] = Investor(
+                msg.value,
+                amountInvestedPlusInterest,
+                0,
+                false
+            );
+            s_investors.push() = payable(_investorAddress);
+            s_currentFundedAmount += msg.value;
+        } else {
+            s_investor[_investorAddress].amountInvested =
+                amountAlreadyInvested +
+                msg.value;
+            uint256 amountAlreadyInvestedPlusInterest = s_investor[
+                _investorAddress
+            ].amountInvestedPlusInterest;
+            s_investor[_investorAddress].amountInvestedPlusInterest =
+                amountAlreadyInvestedPlusInterest +
+                amountInvestedPlusInterest;
+            s_currentFundedAmount += msg.value;
+        }
     }
 
     // Chainlink automation to check if the project is fully funded after the time interval
@@ -144,6 +166,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         if (!upkeepNeeded) {
             revert CrowdfundingProject__UpkeepNotNeeded();
         }
+        // maybe add a check for a project state? can this be called again after this was automaticly called by chainlink?
         if (
             (block.timestamp - s_projectFundingIntervalStart) >
             (i_deadlineInDays * ONE_DAY_IN_SECONDS)
@@ -164,47 +187,53 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         if (s_projectState != ProjectState.FUNDING_ACTIVE) {
             revert CrowdfundingProject__FundingIsNotActive();
         }
+        if (s_projectState == ProjectState.CANCELED) {
+            revert CrowdfundingProject__ProjectAlreadyCanceled();
+        }
         s_projectState = ProjectState.CANCELED;
         setPayOuts();
     }
 
     function setPayOuts() internal {
-        Investor[] memory temporaryInvestors = s_investors;
+        address[] memory temporaryInvestorsAddresses = s_investors;
 
         if (
             s_projectState == ProjectState.CLOSED ||
             s_projectState == ProjectState.CANCELED
         ) {
-            for (uint256 i = 0; i < temporaryInvestors.length; i++) {
-                if (temporaryInvestors[i].paidOut == false) {
-                    address addressOfInvestor = temporaryInvestors[i].investor;
-                    temporaryInvestors[i].paidOut = true;
-                    s_amountToBePaidOut[
-                        addressOfInvestor
-                    ] += temporaryInvestors[i].amountInvested;
+            for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
+                address investorAddress = temporaryInvestorsAddresses[i];
+                if (s_investor[investorAddress].paidOut == false) {
+                    s_investor[investorAddress].amountToPayOut += s_investor[
+                        investorAddress
+                    ].amountInvested;
                 }
             }
         } else if (s_projectState == ProjectState.FINISHED) {
-            for (uint256 i = 0; i < temporaryInvestors.length; i++) {
-                if (temporaryInvestors[i].paidOut == false) {
-                    address addressOfInvestor = temporaryInvestors[i].investor;
-                    temporaryInvestors[i].paidOut = true;
-                    s_amountToBePaidOut[
-                        addressOfInvestor
-                    ] += temporaryInvestors[i].amountInvestedPlusInterest;
+            for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
+                address investorAddress = temporaryInvestorsAddresses[i];
+                if (s_investor[investorAddress].paidOut == false) {
+                    s_investor[investorAddress].amountToPayOut += s_investor[
+                        investorAddress
+                    ].amountInvestedPlusInterest;
                 }
             }
         }
 
         uint256 amountInvestedOfAllInvestors = getInvestedAmountForAllInvestors();
 
-        s_amountToBePaidOut[i_owner] = (address(this).balance -
+        s_investor[i_owner].amountToPayOut = (address(this).balance -
             amountInvestedOfAllInvestors);
     }
 
     // lets the investors and owner withdraw if the project was CANCELED, CLOSED or FINISHED
     function withdrawPayOuts() external payable {
-        uint256 amountToPayOut = s_amountToBePaidOut[msg.sender];
+        if (s_investor[msg.sender].paidOut == true) {
+            revert CrowdfundingProject__AlreadyWithdrawed();
+        }
+        uint256 amountToPayOut = s_investor[msg.sender].amountToPayOut;
+
+        s_investor[msg.sender].paidOut == true;
 
         (bool success, ) = payable(msg.sender).call{value: amountToPayOut}("");
         require(success, "Withdraw failed");
@@ -238,13 +267,9 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
             revert CrowdfundingProject__InvestingIsNotActive();
         }
-        // uint256 contractBalance = address(this).balance;
-        // uint256 amountNeeded = getInvestedPlusInteresToAllInvestorsWithoutGasFees();
-        // if (contractBalance < amountNeeded) {
-        //     revert CrowdfundingProject__ContractHasLessEthThenNeededToPayOutAllInvestors(
-        //         amountNeeded
-        //     );
-        // }
+        if (s_projectState == ProjectState.FINISHED) {
+            revert CrowdfundingProject__ProjectAlreadyFinished();
+        }
 
         s_projectState = ProjectState.FINISHED;
         setPayOuts();
@@ -264,15 +289,17 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
     // VIEW GETTER FUNCTIONS //
     ///////////////////////////
     function getInvestedAmountForAllInvestors() public view returns (uint256) {
-        Investor[] memory temporaryInvestors = s_investors;
-        uint256 amountToBePaidOut = 0;
+        address[] memory temporaryInvestorsAddresses = s_investors;
+        uint256 amountInvestedAll = 0;
 
-        for (uint256 i = 0; i < temporaryInvestors.length; i++) {
-            if (temporaryInvestors[i].paidOut == false) {
-                amountToBePaidOut += temporaryInvestors[i].amountInvested;
+        for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
+            address investorsAddress = temporaryInvestorsAddresses[i];
+            if (s_investor[investorsAddress].paidOut == false) {
+                amountInvestedAll += s_investor[investorsAddress]
+                    .amountInvested;
             }
         }
-        return amountToBePaidOut;
+        return amountInvestedAll;
     }
 
     function getInvestedPlusInteresOfAllInvestorsWithoutGasFees()
@@ -280,28 +307,17 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         view
         returns (uint256)
     {
-        uint256 fullAmountToBePaid = 0;
-        Investor[] memory temporaryInvestors = s_investors;
+        address[] memory temporaryInvestorsAddresses = s_investors;
+        uint256 amountInvestedPlusInterestAll = 0;
 
-        for (uint256 i = 0; i < temporaryInvestors.length; i++) {
-            if (temporaryInvestors[i].paidOut == false) {
-                uint256 amountToBepaidOut = temporaryInvestors[i]
+        for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
+            address investorsAddress = temporaryInvestorsAddresses[i];
+            if (s_investor[investorsAddress].paidOut == false) {
+                amountInvestedPlusInterestAll += s_investor[investorsAddress]
                     .amountInvestedPlusInterest;
-                fullAmountToBePaid += amountToBepaidOut;
             }
         }
-        return fullAmountToBePaid;
-    }
-
-    function getInvestor(
-        address _investorAddress
-    ) public view returns (Investor memory) {
-        Investor[] memory temporaryInvestors = s_investors;
-        for (uint256 i = 0; i < temporaryInvestors.length; i++) {
-            if (temporaryInvestors[i].investor == _investorAddress) {
-                return temporaryInvestors[i];
-            }
-        }
+        return amountInvestedPlusInterestAll;
     }
 
     function getRemainingFundingAmount() public view returns (uint256) {
@@ -356,34 +372,22 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         return s_investors.length;
     }
 
+    function getInvestorInvestmentAmount(
+        address _investorAddress
+    ) external view returns (uint256) {
+        return s_investor[_investorAddress].amountInvested;
+    }
+
     function getInvestedPlusInterest(
         address _investorAddress
     ) external view returns (uint256) {
-        Investor[] memory temporaryInvestors = s_investors;
-        for (uint256 i = 0; i < temporaryInvestors.length; i++) {
-            if (temporaryInvestors[i].investor == _investorAddress) {
-                return temporaryInvestors[i].amountInvestedPlusInterest;
-            }
-        }
-        return 0;
+        return s_investor[_investorAddress].amountInvestedPlusInterest;
     }
 
     function getInvestorPaidOutStatus(
         address _investorAddress
     ) external view returns (bool) {
-        return getInvestor(_investorAddress).paidOut;
-    }
-
-    function getInvestorAddress(
-        address _investorAddress
-    ) external view returns (address) {
-        return getInvestor(_investorAddress).investor;
-    }
-
-    function getInvestorInvestmentAmount(
-        address _investorAddress
-    ) external view returns (uint256) {
-        return getInvestor(_investorAddress).amountInvested;
+        return s_investor[_investorAddress].paidOut;
     }
 
     function getCrowdfundingContractAddress() external view returns (address) {
