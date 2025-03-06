@@ -255,7 +255,9 @@ contract TestCrowdfundingProject is Test {
         crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
     }
 
-    function testShouldFundToTheContractAndUpdateInvestorArray() public {
+    function testShouldFundToTheContractAndUpdateInvestorMappingWithMultipleInvestors()
+        public
+    {
         CrowdfundingProject project = createProject();
 
         uint256 investedAmountBefore = project.getInvestorInvestmentAmount(
@@ -270,23 +272,240 @@ contract TestCrowdfundingProject is Test {
 
         vm.prank(INVESTOR);
         crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
-        vm.prank(INVESTOR);
-        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
-
         vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        vm.prank(INVESTOR3);
         crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
 
         uint256 investedAmountAfter = project.getInvestorInvestmentAmount(
             INVESTOR
         );
+        uint256 investedPlusInterestAmount = project.getInvestedPlusInterest(
+            INVESTOR
+        );
         uint256 investedAmountAfter2 = project.getInvestorInvestmentAmount(
             INVESTOR2
         );
+        uint256 investedPlusInterestAmount2 = project.getInvestedPlusInterest(
+            INVESTOR2
+        );
+        uint256 investedAmountAfter3 = project.getInvestorInvestmentAmount(
+            INVESTOR3
+        );
+        uint256 investedPlusInterestAmount3 = project.getInvestedPlusInterest(
+            INVESTOR3
+        );
 
+        assertEq(investedAmountAfter, CORRECT_INVESTMENT_AMOUNT);
         assertEq(
-            investedAmountAfter,
+            investedPlusInterestAmount,
+            (CORRECT_INVESTMENT_AMOUNT / 10) + CORRECT_INVESTMENT_AMOUNT
+        );
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), false);
+        assertEq(project.getAmountToBePaidOut(INVESTOR), 0);
+
+        assertEq(investedAmountAfter2, MIN_INVESTMENT);
+        assertEq(
+            investedPlusInterestAmount2,
+            (MIN_INVESTMENT / 10) + MIN_INVESTMENT
+        );
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR2), false);
+        assertEq(project.getAmountToBePaidOut(INVESTOR2), 0);
+
+        assertEq(investedAmountAfter3, MAX_INVESTMENT);
+        assertEq(
+            investedPlusInterestAmount3,
+            (MAX_INVESTMENT / 10) + MAX_INVESTMENT
+        );
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR3), false);
+        assertEq(project.getAmountToBePaidOut(INVESTOR3), 0);
+    }
+
+    function testShouldFundToTheContractAndUpdateInvestorMappingWithOneInvestor()
+        public
+    {
+        CrowdfundingProject project = createProject();
+
+        uint256 investedAmountBefore = project.getInvestorInvestmentAmount(
+            INVESTOR
+        );
+        assertEq(investedAmountBefore, 0);
+
+        // fund #1
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        uint256 investedAmountAfter = project.getInvestorInvestmentAmount(
+            INVESTOR
+        );
+        assertEq(investedAmountAfter, CORRECT_INVESTMENT_AMOUNT);
+        assertEq(
+            project.getInvestedPlusInterest(INVESTOR),
+            (CORRECT_INVESTMENT_AMOUNT / 10) + CORRECT_INVESTMENT_AMOUNT
+        );
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), false);
+        assertEq(project.getAmountToBePaidOut(INVESTOR), 0);
+
+        // fund #2
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        uint256 investedAmountAfter2 = project.getInvestorInvestmentAmount(
+            INVESTOR
+        );
+        assertEq(
+            investedAmountAfter2,
             CORRECT_INVESTMENT_AMOUNT + MIN_INVESTMENT
         );
-        assertEq(investedAmountAfter2, MAX_INVESTMENT);
+        assertEq(
+            project.getInvestedPlusInterest(INVESTOR),
+            ((CORRECT_INVESTMENT_AMOUNT + MIN_INVESTMENT) / 10) +
+                (CORRECT_INVESTMENT_AMOUNT + MIN_INVESTMENT)
+        );
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), false);
+        assertEq(project.getAmountToBePaidOut(INVESTOR), 0);
+
+        // fund #3
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        uint256 investedAmountAfter3 = project.getInvestorInvestmentAmount(
+            INVESTOR
+        );
+        assertEq(
+            investedAmountAfter3,
+            CORRECT_INVESTMENT_AMOUNT + MIN_INVESTMENT + MAX_INVESTMENT
+        );
+        assertEq(
+            project.getInvestedPlusInterest(INVESTOR),
+            ((CORRECT_INVESTMENT_AMOUNT + MIN_INVESTMENT + MAX_INVESTMENT) /
+                10 +
+                (CORRECT_INVESTMENT_AMOUNT + MIN_INVESTMENT + MAX_INVESTMENT))
+        );
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), false);
+        assertEq(project.getAmountToBePaidOut(INVESTOR), 0);
+    }
+
+    function testShouldFundToTheContractAndUpdateTheCurrentFundingAmountWithOneInvestor()
+        public
+    {
+        CrowdfundingProject project = createProject();
+
+        uint256 contractBalanceBefore = address(project).balance;
+        uint256 expectedContractBalanceBefore = project
+            .getCurrentFundedAmount();
+
+        assertEq(contractBalanceBefore, initialFeesToBePaid);
+        assertEq(expectedContractBalanceBefore, 0);
+
+        // fund #1
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        uint256 contractBalanceAfter = address(project).balance;
+        uint256 expectedContractBalanceAfter = project.getCurrentFundedAmount();
+
+        assertEq(
+            contractBalanceAfter,
+            contractBalanceBefore + CORRECT_INVESTMENT_AMOUNT
+        );
+        assertEq(expectedContractBalanceAfter, CORRECT_INVESTMENT_AMOUNT);
+
+        // fund #2
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        uint256 contractBalanceAfter2 = address(project).balance;
+        uint256 expectedContractBalanceAfter2 = project
+            .getCurrentFundedAmount();
+
+        assertEq(
+            contractBalanceAfter2,
+            contractBalanceBefore + CORRECT_INVESTMENT_AMOUNT + MIN_INVESTMENT
+        );
+        assertEq(
+            expectedContractBalanceAfter2,
+            CORRECT_INVESTMENT_AMOUNT + MIN_INVESTMENT
+        );
+    }
+
+    function testShouldFundToTheContractAndUpdateTheCurrentFundingAmountWithMultipleInvestors()
+        public
+    {
+        CrowdfundingProject project = createProject();
+
+        uint256 contractBalanceBefore = address(project).balance;
+        uint256 expectedContractBalanceBefore = project
+            .getCurrentFundedAmount();
+
+        assertEq(contractBalanceBefore, initialFeesToBePaid);
+        assertEq(expectedContractBalanceBefore, 0);
+
+        // fund #1
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        uint256 contractBalanceAfter = address(project).balance;
+        uint256 expectedContractBalanceAfter = project.getCurrentFundedAmount();
+
+        assertEq(
+            contractBalanceAfter,
+            contractBalanceBefore + CORRECT_INVESTMENT_AMOUNT
+        );
+        assertEq(expectedContractBalanceAfter, CORRECT_INVESTMENT_AMOUNT);
+
+        // fund #2
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        uint256 contractBalanceAfter2 = address(project).balance;
+        uint256 expectedContractBalanceAfter2 = project
+            .getCurrentFundedAmount();
+
+        assertEq(
+            contractBalanceAfter2,
+            contractBalanceBefore + CORRECT_INVESTMENT_AMOUNT + MAX_INVESTMENT
+        );
+        assertEq(
+            expectedContractBalanceAfter2,
+            CORRECT_INVESTMENT_AMOUNT + MAX_INVESTMENT
+        );
+    }
+
+    function testShouldFundToTheContractAndUpdateInvestorsArrayWithMultipleInvestors()
+        public
+    {
+        CrowdfundingProject project = createProject();
+
+        // fund #1
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        assertEq(project.getInvestorAddress(0), INVESTOR);
+
+        // fund #2
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        assertEq(project.getInvestorAddress(1), INVESTOR2);
+
+        // fund #3
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        assertEq(project.getInvestorAddress(2), INVESTOR3);
+    }
+
+    function testShouldFundToTheContractAndUpdateInvestorsArrayWithOneInvestor()
+        public
+    {
+        CrowdfundingProject project = createProject();
+
+        // fund #1
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        assertEq(project.getInvestorAddress(0), INVESTOR);
+
+        // fund #2
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.expectRevert();
+        project.getInvestorAddress(1);
+
+        // fund #3
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        vm.expectRevert();
+        project.getInvestorAddress(2);
     }
 }
