@@ -384,10 +384,20 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         return s_investor[_investorAddress].amountInvestedPlusInterest;
     }
 
+    function getAmountToBePaidOut(
+        address _investorAddress
+    ) external view returns (uint256) {
+        return s_investor[_investorAddress].amountToPayOut;
+    }
+
     function getInvestorPaidOutStatus(
         address _investorAddress
     ) external view returns (bool) {
         return s_investor[_investorAddress].paidOut;
+    }
+
+    function getInvestorAddress(uint256 _index) public view returns (address) {
+        return s_investors[_index];
     }
 
     function getCrowdfundingContractAddress() external view returns (address) {
