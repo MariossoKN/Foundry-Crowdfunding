@@ -647,25 +647,9 @@ contract TestCrowdfunding is Test {
         assertEq(expectedFee, actualFee);
     }
 
-    //////////////////////
-    // getInvestor TEST //
-    //////////////////////
-    function testgetInvestor() public {
-        uint256 projectId = 0;
-        CrowdfundingProject project = createProject();
-
-        vm.startPrank(INVESTOR);
-        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(projectId);
-        vm.startPrank(INVESTOR2);
-        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(projectId);
-
-        project.getInvestor(INVESTOR);
-        project.getInvestor(INVESTOR2);
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////////
-    // getInvestorPaidOutStatus, getInvestorAddress, getInvestorInvestmentAmount TEST //
-    ////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////
+    // getInvestorPaidOutStatus, getInvestorInvestmentAmount TEST //
+    ////////////////////////////////////////////////////////////////
 
     function testGetInvestorInformation() public {
         uint256 projectId = 0;
@@ -682,11 +666,6 @@ contract TestCrowdfunding is Test {
         assertEq(paidOut, false);
         bool paidOut2 = project.getInvestorPaidOutStatus(INVESTOR2);
         assertEq(paidOut2, false);
-
-        address investorAddress = project.getInvestorAddress(INVESTOR);
-        address investorAddress2 = project.getInvestorAddress(INVESTOR2);
-        assertEq(investorAddress, INVESTOR);
-        assertEq(investorAddress2, INVESTOR2);
 
         uint256 investorInvestmentAmount = project.getInvestorInvestmentAmount(
             INVESTOR
