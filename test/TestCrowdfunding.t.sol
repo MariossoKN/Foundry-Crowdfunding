@@ -8,7 +8,6 @@ import {DeployCrowdfunding} from "../script/DeployCrowdfunding.s.sol";
 import {HelperConfig} from "../script/HelperConfig.s.sol";
 import {Vm} from "../../lib/forge-std/src/Vm.sol";
 import {Test, console} from "../../lib/forge-std/src/Test.sol";
-import {console} from "forge-std/console.sol";
 
 contract TestCrowdfunding is Test {
     event ProjectCreated(
