@@ -8,7 +8,6 @@ import {DeployCrowdfunding} from "../script/DeployCrowdfunding.s.sol";
 import {HelperConfig} from "../script/HelperConfig.s.sol";
 import {Vm} from "../../lib/forge-std/src/Vm.sol";
 import {Test, console} from "../../lib/forge-std/src/Test.sol";
-import {console} from "forge-std/console.sol";
 
 contract TestCrowdfundingProject is Test {
     Crowdfunding public crowdfunding;
@@ -106,13 +105,18 @@ contract TestCrowdfundingProject is Test {
         return project;
     }
 
-    function createProjectFullyFundItAndPerformUpkeepAndFinish() public {
-        createProjectFullyFundItAndPerformUpkeep();
+    function createProjectFullyFundItAndPerformUpkeepAndFinish()
+        public
+        returns (CrowdfundingProject)
+    {
+        CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeep();
 
         vm.prank(PROJECT_OWNER);
         crowdfunding.ownerFundProject{value: 4 * MAX_INVESTMENT}(0);
         vm.prank(PROJECT_OWNER);
         crowdfunding.finishProject(0);
+
+        return project;
     }
 
     //////////////////////
@@ -594,6 +598,61 @@ contract TestCrowdfundingProject is Test {
         project.performUpkeep("");
     }
 
+    function testRevertIfCalledInClosedState() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        assertEq(uint256(project.getProjectStatus()), 0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__FundingIsNotActive
+                    .selector
+            )
+        );
+        project.performUpkeep("");
+    }
+
+    function testShouldRevertIfCalledInFinishedState() public {
+        CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeepAndFinish();
+
+        assertEq(uint256(project.getProjectStatus()), 3);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__FundingIsNotActive
+                    .selector
+            )
+        );
+        project.performUpkeep("");
+    }
+
+    function testShouldRevertIfCalledInInvestingActiveState() public {
+        CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeep();
+
+        assertEq(uint256(project.getProjectStatus()), 2);
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.ownerFundProject{value: STARTING_BALANCE * 3}(0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__FundingIsNotActive
+                    .selector
+            )
+        );
+        project.performUpkeep("");
+    }
+
     function testShouldChangeProjectStateToClosedAndSetPayOutsWithOneInvestor()
         public
     {
@@ -646,16 +705,412 @@ contract TestCrowdfundingProject is Test {
         assertEq(uint256(project.getProjectStatus()), 0); // 1 = Closed
     }
 
-    function testCanWeCallPerformUpkeepAfterItWasAlreadyPerformed() public {
+    function testShouldChangeTheStateToInvestingActiveAndWithdrawFundsToProjectOwnerAndCrowdfundingContract()
+        public
+    {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+
+        uint256 projectOwnerBalanceBefore = address(PROJECT_OWNER).balance;
+        uint256 projectContractBalanceBefore = address(project).balance;
+        uint256 crowdfundingContractBalanceBefore = address(crowdfunding)
+            .balance;
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        uint256 projectOwnerBalanceAfter = address(PROJECT_OWNER).balance;
+        uint256 projectContractBalanceAfter = address(project).balance;
+        uint256 crowdfundingContractBalanceAfter = address(crowdfunding)
+            .balance;
+        uint256 projectStatus = uint256(project.getProjectStatus());
+
+        assertEq(
+            projectOwnerBalanceAfter,
+            projectOwnerBalanceBefore + (MAX_INVESTMENT * 3)
+        );
+        assertEq(
+            projectContractBalanceAfter,
+            projectContractBalanceBefore -
+                (MAX_INVESTMENT * 3) -
+                initialFeesToBePaid
+        );
+        assertEq(
+            crowdfundingContractBalanceAfter,
+            crowdfundingContractBalanceBefore + initialFeesToBePaid
+        );
+        assertEq(projectStatus, 2); // 1 = Investing Active
+    }
+
+    /////////////////
+    // cancel TEST //
+    /////////////////
+    function testShoulRevertIfCalledByNotCrowdfundingContract() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__CanOnlyBeCalledByTheCrowdfundingContract
+                    .selector
+            )
+        );
+        project.cancel();
+    }
+
+    function testShoulRevertIfCalledInClosedState() public {
+        CrowdfundingProject project = createProject();
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__FundingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.cancelProject(0);
+    }
+
+    function testShoulRevertIfCalledInInvestingActiveState() public {
+        createProjectFullyFundItAndPerformUpkeep();
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__FundingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.cancelProject(0);
+    }
+
+    function testShoulRevertIfCalledInFinishedState() public {
+        createProjectFullyFundItAndPerformUpkeepAndFinish();
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__FundingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.cancelProject(0);
+    }
+
+    function testShoulRevertIfCalledAlreadyCanceled() public {
+        createProject();
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.cancelProject(0);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__FundingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.cancelProject(0);
+    }
+
+    function testShouldChangeStateToCanceledAndSetPayOuts() public {
+        CrowdfundingProject project = createProject();
+
+        assertEq(uint256(project.getProjectStatus()), 1);
+        assertEq(project.getAmountToBePaidOut(INVESTOR), 0);
+        assertEq(project.getAmountToBePaidOut(INVESTOR2), 0);
+        assertEq(project.getAmountToBePaidOut(INVESTOR3), 0);
+        assertEq(project.getAmountToBePaidOut(PROJECT_OWNER), 0);
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.cancelProject(0);
+
+        assertEq(uint256(project.getProjectStatus()), 4);
+        assertEq(project.getAmountToBePaidOut(INVESTOR), MAX_INVESTMENT);
+        assertEq(project.getAmountToBePaidOut(INVESTOR2), MAX_INVESTMENT);
+        assertEq(project.getAmountToBePaidOut(INVESTOR3), MIN_INVESTMENT);
+        assertEq(
+            project.getAmountToBePaidOut(PROJECT_OWNER),
+            initialFeesToBePaid
+        );
+    }
+
+    //////////////////////////
+    // withdrawPayOuts TEST //
+    //////////////////////////
+    function testShoulRevertIfAlreadyWithdrawed() public {
+        CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeepAndFinish();
+
+        vm.prank(INVESTOR);
+        project.withdrawPayOuts();
+        vm.prank(INVESTOR2);
+        project.withdrawPayOuts();
+        vm.prank(INVESTOR3);
+        project.withdrawPayOuts();
+
+        vm.prank(INVESTOR);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__AlreadyWithdrawed
+                    .selector
+            )
+        );
+        project.withdrawPayOuts();
+
+        vm.prank(INVESTOR2);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__AlreadyWithdrawed
+                    .selector
+            )
+        );
+        project.withdrawPayOuts();
+
+        vm.prank(INVESTOR3);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__AlreadyWithdrawed
+                    .selector
+            )
+        );
+        project.withdrawPayOuts();
+    }
+
+    function testShoulRevertIfPayOutAmountIsZero() public {
+        CrowdfundingProject project = createProject();
+
+        assertEq(project.getAmountToBePaidOut(INVESTOR), 0);
+
+        vm.prank(INVESTOR);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__PayOutsNotActive
+                    .selector
+            )
+        );
+        project.withdrawPayOuts();
+    }
+
+    function testShouldWithrawTheRightAmountAndChangeThePaidOutToTrue() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT * 3}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT * 2}(0);
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        uint256 investorBalanceBefore = address(INVESTOR).balance;
+        uint256 investorBalanceBefore2 = address(INVESTOR2).balance;
+        uint256 investorBalanceBefore3 = address(INVESTOR3).balance;
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.ownerFundProject{value: STARTING_BALANCE * 3}(0);
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.finishProject(0);
+
+        vm.prank(INVESTOR);
+        project.withdrawPayOuts();
+        vm.prank(INVESTOR2);
+        project.withdrawPayOuts();
+        vm.prank(INVESTOR3);
+        project.withdrawPayOuts();
+
+        uint256 expectedPayOut = project.getAmountToBePaidOut(INVESTOR);
+        uint256 expectedPayOut2 = project.getAmountToBePaidOut(INVESTOR2);
+        uint256 expectedPayOut3 = project.getAmountToBePaidOut(INVESTOR3);
+
+        uint256 investorBalanceAfter = address(INVESTOR).balance;
+        uint256 investorBalanceAfter2 = address(INVESTOR2).balance;
+        uint256 investorBalanceAfter3 = address(INVESTOR3).balance;
+
+        assertEq(
+            expectedPayOut,
+            ((MAX_INVESTMENT * 2) / INTEREST_RATE) + MAX_INVESTMENT * 2
+        );
+        assertEq(
+            expectedPayOut2,
+            ((CORRECT_INVESTMENT_AMOUNT * 3) / INTEREST_RATE) +
+                CORRECT_INVESTMENT_AMOUNT *
+                3
+        );
+        assertEq(
+            expectedPayOut3,
+            ((CORRECT_INVESTMENT_AMOUNT * 2) / INTEREST_RATE) +
+                CORRECT_INVESTMENT_AMOUNT *
+                2
+        );
+
+        assertEq(investorBalanceAfter, investorBalanceBefore + expectedPayOut);
+        assertEq(
+            investorBalanceAfter2,
+            investorBalanceBefore2 + expectedPayOut2
+        );
+        assertEq(
+            investorBalanceAfter3,
+            investorBalanceBefore3 + expectedPayOut3
+        );
+
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), true);
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR2), true);
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR3), true);
+    }
+
+    ////////////////////
+    // ownerFund TEST //
+    ////////////////////
+    function testShouldRevertIfNotCalledByCrowdfundingContract() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__CanOnlyBeCalledByTheCrowdfundingContract
+                    .selector
+            )
+        );
+        project.ownerFund();
+    }
+
+    function testRevertsIfCalledInClosedState() public {
+        CrowdfundingProject project = createProject();
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        assertEq(uint256(project.getProjectStatus()), 0);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__InvestingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.ownerFundProject{value: MAX_INVESTMENT}(0);
+    }
+
+    function testShouldRevertIfCalledInClosedState() public {
+        CrowdfundingProject project = createProject();
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        assertEq(uint256(project.getProjectStatus()), 0);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__InvestingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.ownerFundProject{value: MAX_INVESTMENT}(0);
+    }
+
+    function testShouldRevertIfCalledInFundingActiveState() public {
+        CrowdfundingProject project = createProject();
+
+        assertEq(uint256(project.getProjectStatus()), 1);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__InvestingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.ownerFundProject{value: MAX_INVESTMENT}(0);
+    }
+
+    function testRevertsIfCalledInFinishedState() public {
+        CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeepAndFinish();
+
+        assertEq(uint256(project.getProjectStatus()), 3);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__InvestingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.ownerFundProject{value: MAX_INVESTMENT}(0);
+    }
+
+    function testShouldRevertIfCalledInCanceledState() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.cancelProject(0);
+
+        assertEq(uint256(project.getProjectStatus()), 4);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__InvestingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.ownerFundProject{value: MAX_INVESTMENT}(0);
+    }
+
+    function testShouldFundToTheContract() public {
         CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeep();
 
-        assertEq(uint256(project.getProjectStatus()), 2);
+        uint256 projectContractBalanceBefore = address(project).balance;
 
         vm.prank(PROJECT_OWNER);
         crowdfunding.ownerFundProject{value: STARTING_BALANCE * 3}(0);
 
-        project.performUpkeep("");
+        uint256 projectContractBalanceAfter = address(project).balance;
 
-        assertEq(uint256(project.getProjectStatus()), 0);
+        assertEq(
+            projectContractBalanceBefore + (STARTING_BALANCE * 3),
+            projectContractBalanceAfter
+        );
     }
 }
