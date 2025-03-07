@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.18;
 
-import {AutomationBase, AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
+import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 
-contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
+contract CrowdfundingProject is AutomationCompatibleInterface {
     error CrowdfundingProject__NotEnoughEthSent();
     error CrowdfundingProject__TooMuchEthSent();
     error CrowdfundingProject__MinInvestmentGreaterOrEqualToMaxInvestment();
@@ -14,6 +14,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
     );
     error CrowdfundingProject__FundingIsNotActive();
     error CrowdfundingProject__InvestingIsNotActive();
+    error CrowdfundingProject__PayOutsNotActive();
     error CrowdfundingProject__CanOnlyBeCalledByTheCrowdfundingContract();
     error CrowdfundingProject__ContractHasLessEthThenNeededToPayOutAllInvestors(
         uint256
@@ -166,7 +167,9 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
         if (!upkeepNeeded) {
             revert CrowdfundingProject__UpkeepNotNeeded();
         }
-        // maybe add a check for a project state? can this be called again after this was automaticly called by chainlink?
+        if (s_projectState != ProjectState.FUNDING_ACTIVE) {
+            revert CrowdfundingProject__FundingIsNotActive();
+        }
         if (
             (block.timestamp - s_projectFundingIntervalStart) >
             (i_deadlineInDays * ONE_DAY_IN_SECONDS)
@@ -232,8 +235,10 @@ contract CrowdfundingProject is AutomationCompatibleInterface, AutomationBase {
             revert CrowdfundingProject__AlreadyWithdrawed();
         }
         uint256 amountToPayOut = s_investor[msg.sender].amountToPayOut;
-
-        s_investor[msg.sender].paidOut == true;
+        if (amountToPayOut == 0) {
+            revert CrowdfundingProject__PayOutsNotActive();
+        }
+        s_investor[msg.sender].paidOut = true;
 
         (bool success, ) = payable(msg.sender).call{value: amountToPayOut}("");
         require(success, "Withdraw failed");
