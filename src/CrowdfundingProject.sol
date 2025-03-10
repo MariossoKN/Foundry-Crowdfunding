@@ -191,9 +191,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         if (s_projectState != ProjectState.FUNDING_ACTIVE) {
             revert CrowdfundingProject__FundingIsNotActive();
         }
-        // if (s_projectState == ProjectState.CANCELED) {
-        //     revert CrowdfundingProject__ProjectAlreadyCanceled();
-        // }
         s_projectState = ProjectState.CANCELED;
         setPayOuts();
     }
@@ -207,7 +204,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         ) {
             for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
                 address investorAddress = temporaryInvestorsAddresses[i];
-                // if (s_investor[investorAddress].paidOut == false) {
                 if (getInvestorPaidOutStatus(investorAddress) == false) {
                     s_investor[investorAddress].amountToPayOut += s_investor[
                         investorAddress
@@ -217,7 +213,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         } else if (s_projectState == ProjectState.FINISHED) {
             for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
                 address investorAddress = temporaryInvestorsAddresses[i];
-                // if (s_investor[investorAddress].paidOut == false) {
                 if (getInvestorPaidOutStatus(investorAddress) == false) {
                     s_investor[investorAddress].amountToPayOut += s_investor[
                         investorAddress
@@ -298,7 +293,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
 
         for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
             address investorAddress = temporaryInvestorsAddresses[i];
-            // if (s_investor[investorsAddress].paidOut == false) {
             if (getInvestorPaidOutStatus(investorAddress) == false) {
                 amountInvestedAll += s_investor[investorAddress].amountInvested;
             }
@@ -316,7 +310,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
 
         for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
             address investorAddress = temporaryInvestorsAddresses[i];
-            // if (s_investor[investorsAddress].paidOut == false) {
             if (getInvestorPaidOutStatus(investorAddress) == false) {
                 amountInvestedPlusInterestAll += s_investor[investorAddress]
                     .amountInvestedPlusInterest;
