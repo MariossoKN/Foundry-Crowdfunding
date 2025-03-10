@@ -16,13 +16,11 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
     error CrowdfundingProject__InvestingIsNotActive();
     error CrowdfundingProject__PayOutsNotActive();
     error CrowdfundingProject__CanOnlyBeCalledByTheCrowdfundingContract();
-    error CrowdfundingProject__ContractHasLessEthThenNeededToPayOutAllInvestors(
-        uint256
-    );
     error CrowdfundingProject__UpkeepNotNeeded();
     error CrowdfundingProject__AlreadyWithdrawed();
     error CrowdfundingProject__ProjectAlreadyCanceled();
     error CrowdfundingProject__ProjectAlreadyFinished();
+    error CrowdfundingProject__RateHasToBeBetweenOneAndTenThousand();
 
     modifier onlyCrowdfundingContract() {
         if (msg.sender != s_crowdfundingContractAddress) {
@@ -37,7 +35,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
     address payable private immutable i_owner;
     uint256 private immutable i_maxCrowdfundingAmount;
     uint256 private s_currentFundedAmount;
-    uint256 private immutable i_interestRateInPercent;
+    uint256 private immutable i_interestRate;
     uint256 private immutable i_minInvestment;
     uint256 private immutable i_maxInvestment;
     uint256 private immutable i_deadlineInDays;
@@ -70,7 +68,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         string memory _projectName,
         address payable _projectOwner,
         uint256 _maxCrowfundingAmount,
-        uint256 _interestRateInPercent,
+        uint256 _interestRate,
         uint256 _minInvestment,
         uint256 _maxInvestment,
         uint256 _deadlineInDays,
@@ -83,11 +81,14 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         if (_minInvestment >= _maxInvestment) {
             revert CrowdfundingProject__MinInvestmentGreaterOrEqualToMaxInvestment();
         }
+        if (_interestRate < 1 || _interestRate > 10000) {
+            revert CrowdfundingProject__RateHasToBeBetweenOneAndTenThousand();
+        }
         s_projectName = _projectName;
         i_owner = _projectOwner;
         i_maxCrowdfundingAmount = _maxCrowfundingAmount;
         s_currentFundedAmount = 0;
-        i_interestRateInPercent = _interestRateInPercent;
+        i_interestRate = _interestRate;
         i_minInvestment = _minInvestment;
         i_maxInvestment = _maxInvestment;
         i_deadlineInDays = _deadlineInDays;
@@ -119,7 +120,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
 
         uint256 amountInvestedPlusInterest = calculateInvestedPlusInterest(
             msg.value,
-            i_interestRateInPercent
+            i_interestRate
         );
 
         uint256 amountAlreadyInvested = s_investor[_investorAddress]
@@ -190,9 +191,9 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         if (s_projectState != ProjectState.FUNDING_ACTIVE) {
             revert CrowdfundingProject__FundingIsNotActive();
         }
-        if (s_projectState == ProjectState.CANCELED) {
-            revert CrowdfundingProject__ProjectAlreadyCanceled();
-        }
+        // if (s_projectState == ProjectState.CANCELED) {
+        //     revert CrowdfundingProject__ProjectAlreadyCanceled();
+        // }
         s_projectState = ProjectState.CANCELED;
         setPayOuts();
     }
@@ -267,13 +268,10 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         }
     }
 
-    // finishes the project; pays out the investors and send back the rest eth left in the contract to project owner
+    // finishes the project; sets payouts to the investors and to project owner
     function finish() external onlyCrowdfundingContract {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
             revert CrowdfundingProject__InvestingIsNotActive();
-        }
-        if (s_projectState == ProjectState.FINISHED) {
-            revert CrowdfundingProject__ProjectAlreadyFinished();
         }
 
         s_projectState = ProjectState.FINISHED;
@@ -285,9 +283,8 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         uint256 _amountInvested,
         uint256 _interestRateInPercent
     ) public pure returns (uint256) {
-        return
-            _amountInvested +
-            ((_amountInvested * _interestRateInPercent) / 100);
+        uint256 interest = (_amountInvested * _interestRateInPercent) / 10000;
+        return _amountInvested + interest;
     }
 
     ///////////////////////////
@@ -346,7 +343,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
     }
 
     function getProjectInterestRateInPercent() external view returns (uint256) {
-        return i_interestRateInPercent;
+        return i_interestRate;
     }
 
     function getProjectMinInvestment() external view returns (uint256) {
