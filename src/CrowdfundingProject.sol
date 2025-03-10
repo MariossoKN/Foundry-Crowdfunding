@@ -207,7 +207,8 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         ) {
             for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
                 address investorAddress = temporaryInvestorsAddresses[i];
-                if (s_investor[investorAddress].paidOut == false) {
+                // if (s_investor[investorAddress].paidOut == false) {
+                if (getInvestorPaidOutStatus(investorAddress) == false) {
                     s_investor[investorAddress].amountToPayOut += s_investor[
                         investorAddress
                     ].amountInvested;
@@ -216,7 +217,8 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         } else if (s_projectState == ProjectState.FINISHED) {
             for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
                 address investorAddress = temporaryInvestorsAddresses[i];
-                if (s_investor[investorAddress].paidOut == false) {
+                // if (s_investor[investorAddress].paidOut == false) {
+                if (getInvestorPaidOutStatus(investorAddress) == false) {
                     s_investor[investorAddress].amountToPayOut += s_investor[
                         investorAddress
                     ].amountInvestedPlusInterest;
@@ -295,10 +297,10 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         uint256 amountInvestedAll = 0;
 
         for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
-            address investorsAddress = temporaryInvestorsAddresses[i];
-            if (s_investor[investorsAddress].paidOut == false) {
-                amountInvestedAll += s_investor[investorsAddress]
-                    .amountInvested;
+            address investorAddress = temporaryInvestorsAddresses[i];
+            // if (s_investor[investorsAddress].paidOut == false) {
+            if (getInvestorPaidOutStatus(investorAddress) == false) {
+                amountInvestedAll += s_investor[investorAddress].amountInvested;
             }
         }
         return amountInvestedAll;
@@ -313,9 +315,10 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         uint256 amountInvestedPlusInterestAll = 0;
 
         for (uint256 i = 0; i < temporaryInvestorsAddresses.length; i++) {
-            address investorsAddress = temporaryInvestorsAddresses[i];
-            if (s_investor[investorsAddress].paidOut == false) {
-                amountInvestedPlusInterestAll += s_investor[investorsAddress]
+            address investorAddress = temporaryInvestorsAddresses[i];
+            // if (s_investor[investorsAddress].paidOut == false) {
+            if (getInvestorPaidOutStatus(investorAddress) == false) {
+                amountInvestedPlusInterestAll += s_investor[investorAddress]
                     .amountInvestedPlusInterest;
             }
         }
@@ -394,7 +397,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
 
     function getInvestorPaidOutStatus(
         address _investorAddress
-    ) external view returns (bool) {
+    ) public view returns (bool) {
         return s_investor[_investorAddress].paidOut;
     }
 
