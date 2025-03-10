@@ -333,7 +333,7 @@ contract Crowdfunding {
     //////////////////////
     // FALLBACK RECEIVE //
     //////////////////////
-    fallback() external {}
+    fallback() external payable {}
 
     receive() external payable {}
 }

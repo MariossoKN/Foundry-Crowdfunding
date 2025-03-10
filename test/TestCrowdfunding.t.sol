@@ -740,4 +740,36 @@ contract TestCrowdfunding is Test {
             amountWithInterest + amountWithInterest2
         );
     }
+
+    ////////////////////////////
+    // fallback, receive TEST //
+    ////////////////////////////
+
+    function testReceive() public {
+        vm.prank(INVESTOR);
+        (bool success, ) = address(crowdfunding).call{value: 1 ether}("");
+        require(success, "ETH transfer failed");
+
+        uint256 contractBalance = address(crowdfunding).balance;
+        assertEq(contractBalance, 1 ether);
+
+        vm.expectRevert();
+        (bool success2, ) = address(crowdfunding).call("");
+        require(!success2, "Receive should revert if no value is sent");
+    }
+
+    function testFallback() public {
+        vm.prank(INVESTOR);
+        (bool success, ) = address(crowdfunding).call{value: 1 ether}(
+            "invalid"
+        );
+        require(success, "Fallback call failed");
+
+        uint256 contractBalance = address(crowdfunding).balance;
+        assertEq(contractBalance, 1 ether);
+
+        vm.expectRevert();
+        (bool success2, ) = address(crowdfunding).call("invalid");
+        require(!success2, "Fallback should revert if no value is sent");
+    }
 }
