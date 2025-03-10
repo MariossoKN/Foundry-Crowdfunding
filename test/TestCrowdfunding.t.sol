@@ -50,7 +50,7 @@ contract TestCrowdfunding is Test {
 
     string PROJECT_NAME = "Grand Resort Crowdfund Project";
     uint256 CROWDFUNDING_AMOUNT = 150 ether;
-    uint256 INTEREST_RATE = 10; // SHOULD BE IN WEI
+    uint256 INTEREST_RATE = 1000; // 10%
     uint256 MIN_INVESTMENT = 5 ether;
     uint256 MAX_INVESTMENT = 50 ether;
     uint256 DEADLINE_IN_DAYS = 25;
@@ -243,7 +243,7 @@ contract TestCrowdfunding is Test {
         uint256 amount = bound(_amount, 0, minDeadlineInDays - 1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Crowdfunding.CrowdfundingProject__DeadlineIsTooShort.selector,
+                Crowdfunding.Crowdfunding__DeadlineIsTooShort.selector,
                 minDeadlineInDays
             )
         );
@@ -254,6 +254,50 @@ contract TestCrowdfunding is Test {
             MIN_INVESTMENT,
             MAX_INVESTMENT,
             amount,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+    }
+
+    function testShouldRevertIfTheInteresRateIsZero() public {
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__RateHasToBeBetweenOneAndTenThousand
+                    .selector
+            )
+        );
+        crowdfunding.createProject{value: initialFeesToBePaid}(
+            PROJECT_NAME,
+            CROWDFUNDING_AMOUNT,
+            0,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            DEADLINE_IN_DAYS,
+            INVESTMENT_PERIOD_IN_DAYS
+        );
+    }
+
+    function testFuzz_ShouldRevertIfTheInteresRateIsMoreThanTenThousand(
+        uint256 _amount
+    ) public {
+        uint256 amount = bound(_amount, 10001, type(uint104).max);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__RateHasToBeBetweenOneAndTenThousand
+                    .selector
+            )
+        );
+        crowdfunding.createProject{value: initialFeesToBePaid}(
+            PROJECT_NAME,
+            CROWDFUNDING_AMOUNT,
+            amount,
+            MIN_INVESTMENT,
+            MAX_INVESTMENT,
+            DEADLINE_IN_DAYS,
             INVESTMENT_PERIOD_IN_DAYS
         );
     }
@@ -683,10 +727,10 @@ contract TestCrowdfunding is Test {
         vm.prank(INVESTOR2);
         crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
 
-        uint256 amountWithInterest = (CORRECT_INVESTMENT_AMOUNT /
-            INTEREST_RATE) + CORRECT_INVESTMENT_AMOUNT;
-        uint256 amountWithInterest2 = (MIN_INVESTMENT / INTEREST_RATE) +
-            MIN_INVESTMENT;
+        uint256 amountWithInterest = ((CORRECT_INVESTMENT_AMOUNT *
+            INTEREST_RATE) / 10000) + CORRECT_INVESTMENT_AMOUNT;
+        uint256 amountWithInterest2 = ((MIN_INVESTMENT * INTEREST_RATE) /
+            10000) + MIN_INVESTMENT;
 
         uint256 amountWithInterestSum = crowdfunding
             .getInvestedPlusInterestToAllInvestorsWithoutGasFees(0);
