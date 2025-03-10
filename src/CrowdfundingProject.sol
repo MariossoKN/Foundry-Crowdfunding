@@ -287,6 +287,8 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
     ///////////////////////////
     // VIEW GETTER FUNCTIONS //
     ///////////////////////////
+
+    // PUBLIC //
     function getInvestedAmountForAllInvestors() public view returns (uint256) {
         address[] memory temporaryInvestorsAddresses = s_investors;
         uint256 amountInvestedAll = 0;
@@ -322,6 +324,17 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         return i_maxCrowdfundingAmount - s_currentFundedAmount;
     }
 
+    function getInvestorPaidOutStatus(
+        address _investorAddress
+    ) public view returns (bool) {
+        return s_investor[_investorAddress].paidOut;
+    }
+
+    function getInvestorAddress(uint256 _index) public view returns (address) {
+        return s_investors[_index];
+    }
+
+    // EXTERNAL //
     function getProjectName() external view returns (string memory) {
         return s_projectName;
     }
@@ -386,16 +399,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         address _investorAddress
     ) external view returns (uint256) {
         return s_investor[_investorAddress].amountToPayOut;
-    }
-
-    function getInvestorPaidOutStatus(
-        address _investorAddress
-    ) public view returns (bool) {
-        return s_investor[_investorAddress].paidOut;
-    }
-
-    function getInvestorAddress(uint256 _index) public view returns (address) {
-        return s_investors[_index];
     }
 
     function getCrowdfundingContractAddress() external view returns (address) {
