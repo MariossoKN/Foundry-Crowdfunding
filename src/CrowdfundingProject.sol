@@ -18,8 +18,6 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
     error CrowdfundingProject__CanOnlyBeCalledByTheCrowdfundingContract();
     error CrowdfundingProject__UpkeepNotNeeded();
     error CrowdfundingProject__AlreadyWithdrawed();
-    error CrowdfundingProject__ProjectAlreadyCanceled();
-    error CrowdfundingProject__ProjectAlreadyFinished();
     error CrowdfundingProject__RateHasToBeBetweenOneAndTenThousand();
 
     modifier onlyCrowdfundingContract() {
@@ -351,7 +349,7 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         return s_currentFundedAmount;
     }
 
-    function getProjectInterestRateInPercent() external view returns (uint256) {
+    function getProjectInterestRate() external view returns (uint256) {
         return i_interestRate;
     }
 
