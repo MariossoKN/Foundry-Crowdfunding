@@ -45,7 +45,7 @@ contract Crowdfunding {
         CrowdfundingProject projectContract;
         string name;
         uint256 crowdfundedAmount;
-        uint256 interestRateInPercent;
+        uint256 interestRate;
         uint256 minInvestment;
         uint256 maxInvestment;
         uint256 deadlineInDays;
@@ -53,7 +53,7 @@ contract Crowdfunding {
         address owner;
     }
 
-    error CrowdfundingProject__DeadlineIsTooShort(uint256);
+    error Crowdfunding__DeadlineIsTooShort(uint256);
     error Crowdfunding__YouAreNotAllowedToCancelThisProject();
     error Crowdfunding__YouHaveToSendTheExactAmountForInitialFees(uint256);
     error Crowdfunding__CanBeCalledOnlyByOwner();
@@ -81,7 +81,7 @@ contract Crowdfunding {
     /**
      * @dev lets the crowdfunding project owner to create a new project (new contract); project owner has to pay the initial fee which is % from the crowdfunded amount. If projects funding will be successful, fees will be sent back to this contract; if the project will be canceled, the initial fees will be returned to project owner (minus gas fees)
      * @param _crowdfundedAmount the amount the project owner wants to crowdfund
-     * @param _interestRateInPercent interest rates which should be paid to investors after vesting time
+     * @param _interestRate interest rates which should be paid to investors after vesting time
      * @param _minInvestment minimum investment which can be invested by investors
      * @param _maxInvestment maximum investment which can be invested by investors
      * @param _deadlineInDays for how long the project should be active. When the deadline is reached and:
@@ -92,7 +92,7 @@ contract Crowdfunding {
     function createProject(
         string memory _projectName,
         uint256 _crowdfundedAmount,
-        uint256 _interestRateInPercent,
+        uint256 _interestRate,
         uint256 _minInvestment,
         uint256 _maxInvestment,
         uint256 _deadlineInDays,
@@ -109,7 +109,7 @@ contract Crowdfunding {
             revert Crowdfunding__NameCantBeEmpty();
         }
         if (_deadlineInDays < i_minDeadlineInDays) {
-            revert CrowdfundingProject__DeadlineIsTooShort(i_minDeadlineInDays);
+            revert Crowdfunding__DeadlineIsTooShort(i_minDeadlineInDays);
         }
         CrowdfundingProject crowdfundingProject = new CrowdfundingProject{
             value: msg.value
@@ -117,19 +117,18 @@ contract Crowdfunding {
             _projectName,
             payable(msg.sender),
             _crowdfundedAmount,
-            _interestRateInPercent,
+            _interestRate,
             _minInvestment,
             _maxInvestment,
             _deadlineInDays,
             _investmentPeriodDays,
             payable(address(this))
         );
-        // q should we use mapping instead of array?
         s_crowdfundingProjectArray.push() = Project(
             crowdfundingProject,
             _projectName,
             _crowdfundedAmount,
-            _interestRateInPercent,
+            _interestRate,
             _minInvestment,
             _maxInvestment,
             _deadlineInDays,
@@ -256,7 +255,7 @@ contract Crowdfunding {
     function getInterestRate(
         uint256 _projectId
     ) external view returns (uint256) {
-        return s_crowdfundingProjectArray[_projectId].interestRateInPercent;
+        return s_crowdfundingProjectArray[_projectId].interestRate;
     }
 
     function getMinInvestmentAmount(
