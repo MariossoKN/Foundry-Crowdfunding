@@ -1227,13 +1227,9 @@ contract TestCrowdfundingProject is Test {
         assertEq(uint256(project.getProjectStatus()), 3);
     }
 
-    ///////////////////////////////////
-    // calculateInvestedPlusInterest //
-    ///////////////////////////////////
-    function testShouldRevertIfTheInteresValueIsZeroOrMoreThanTenThousand()
-        public
-    {}
-
+    ////////////////////////////////////////
+    // calculateInvestedPlusInterest TEST //
+    ////////////////////////////////////////
     function testShouldCalculateAmountInvestedPlusInterest() public {
         uint256 expectedCalculatedAmount = ((MIN_INVESTMENT * INTEREST_RATE) /
             10000) + MIN_INVESTMENT;
@@ -1267,6 +1263,343 @@ contract TestCrowdfundingProject is Test {
                 INTEREST_RATE3
             ),
             expectedCalculatedAmount3
+        );
+    }
+
+    ///////////////////////////
+    // getter functions TEST //
+    ///////////////////////////
+    /**
+     * @dev some getter functions are already tested in constructor test
+     */
+
+    ///////////////////////////////////////////
+    // getInvestedAmountForAllInvestors TEST //
+    ///////////////////////////////////////////
+    function testShouldGetAmountInvestedOfAllInvestorsTogetherWithMultipleInvestors()
+        public
+    {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+
+        uint256 expectedAmountInvested = MIN_INVESTMENT +
+            CORRECT_INVESTMENT_AMOUNT +
+            MIN_INVESTMENT +
+            MAX_INVESTMENT +
+            CORRECT_INVESTMENT_AMOUNT +
+            MAX_INVESTMENT;
+
+        assertEq(
+            project.getInvestedAmountForAllInvestors(),
+            expectedAmountInvested
+        );
+    }
+
+    function testShouldGetAmountInvestedOfAllInvestorsTogetherWithOneInvestor()
+        public
+    {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MIN_INVESTMENT * 2}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+
+        uint256 expectedAmountInvested = MIN_INVESTMENT +
+            CORRECT_INVESTMENT_AMOUNT +
+            (MIN_INVESTMENT * 2) +
+            MAX_INVESTMENT;
+
+        assertEq(
+            project.getInvestedAmountForAllInvestors(),
+            expectedAmountInvested
+        );
+    }
+
+    /////////////////////////////////////////////////////////////
+    // getInvestedPlusInteresOfAllInvestorsWithoutGasFees TEST //
+    /////////////////////////////////////////////////////////////
+    function testShouldGetAmountInvestedPlusInterestOfAll() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        // 15 ETH
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        // 55 ETH
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        // 60 ETH
+
+        uint256 expectedAmountInvestor1 = project.getInvestedPlusInterest(
+            INVESTOR
+        );
+        // 16,5 ETH
+        uint256 expectedAmountInvestor2 = project.getInvestedPlusInterest(
+            INVESTOR2
+        );
+        // 60,5 ETH
+        uint256 expectedAmountInvestor3 = project.getInvestedPlusInterest(
+            INVESTOR3
+        );
+        // 66 ETH
+
+        assertEq(
+            project.getInvestedPlusInteresOfAllInvestorsWithoutGasFees(),
+            expectedAmountInvestor1 +
+                expectedAmountInvestor2 +
+                expectedAmountInvestor3
+        );
+        // 143 ETH
+    }
+
+    ////////////////////////////////////
+    // getRemainingFundingAmount TEST //
+    ////////////////////////////////////
+    function testShouldGetRemainingFundingAmount() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+
+        uint256 expectedRemainingAmount = CROWDFUNDING_AMOUNT -
+            CORRECT_INVESTMENT_AMOUNT -
+            MIN_INVESTMENT;
+
+        assertEq(project.getRemainingFundingAmount(), expectedRemainingAmount);
+        // 135 ETH
+
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+
+        uint256 expectedRemainingAmount2 = CROWDFUNDING_AMOUNT -
+            CORRECT_INVESTMENT_AMOUNT -
+            MIN_INVESTMENT -
+            MAX_INVESTMENT;
+
+        assertEq(project.getRemainingFundingAmount(), expectedRemainingAmount2);
+        // 85 ETH
+    }
+
+    ///////////////////////////////////
+    // getInvestorPaidOutStatus TEST //
+    ///////////////////////////////////
+    function testShouldGetPaidOutStatusIfClosed() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), false);
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR2), false);
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), false);
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR2), false);
+
+        vm.prank(INVESTOR);
+        project.withdrawPayOuts();
+        vm.prank(INVESTOR2);
+        project.withdrawPayOuts();
+
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), true);
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR2), true);
+    }
+
+    function testShouldGetPaidOutStatusIfFinished() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), false);
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR2), false);
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), false);
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR2), false);
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.ownerFundProject{value: STARTING_BALANCE * 3}(0);
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.finishProject(0);
+
+        vm.prank(INVESTOR);
+        project.withdrawPayOuts();
+        vm.prank(INVESTOR2);
+        project.withdrawPayOuts();
+
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR), true);
+        assertEq(project.getInvestorPaidOutStatus(INVESTOR2), true);
+    }
+
+    ////////////////////////////
+    // getInvestorsCount TEST //
+    ////////////////////////////
+    function testShouldGetAmountOfInvestors() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+
+        assertEq(project.getInvestorsCount(), 3);
+    }
+
+    //////////////////////////////////////
+    // getInvestorInvestmentAmount TEST //
+    //////////////////////////////////////
+    function testShouldGetInvestorsInvestedAmount() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+
+        assertEq(
+            project.getInvestorInvestmentAmount(INVESTOR),
+            CORRECT_INVESTMENT_AMOUNT + MAX_INVESTMENT
+        );
+        assertEq(
+            project.getInvestorInvestmentAmount(INVESTOR2),
+            MIN_INVESTMENT
+        );
+    }
+
+    //////////////////////////////////
+    // getInvestedPlusInterest TEST //
+    //////////////////////////////////
+    function testShouldGetInvestorsInvestedPlusInterestAmount() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+
+        assertEq(
+            project.getInvestedPlusInterest(INVESTOR),
+            project.calculateInvestedPlusInterest(
+                CORRECT_INVESTMENT_AMOUNT + MAX_INVESTMENT,
+                INTEREST_RATE
+            )
+        );
+        assertEq(
+            project.getInvestedPlusInterest(INVESTOR2),
+            project.calculateInvestedPlusInterest(MIN_INVESTMENT, INTEREST_RATE)
+        );
+    }
+
+    ///////////////////////////////
+    // getAmountToBePaidOut TEST //
+    ///////////////////////////////
+    function testShouldGetInvestorAmountToBePaidOutIfClosed() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MIN_INVESTMENT}(0);
+
+        assertEq(project.getAmountToBePaidOut(INVESTOR), 0);
+        assertEq(project.getAmountToBePaidOut(INVESTOR2), 0);
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        assertEq(
+            project.getAmountToBePaidOut(INVESTOR),
+            CORRECT_INVESTMENT_AMOUNT + MAX_INVESTMENT
+        );
+        assertEq(project.getAmountToBePaidOut(INVESTOR2), MIN_INVESTMENT);
+    }
+
+    function testShouldGetInvestorAmountToBePaidOutIfFinished() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+
+        assertEq(project.getAmountToBePaidOut(INVESTOR), 0);
+        assertEq(project.getAmountToBePaidOut(INVESTOR2), 0);
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.ownerFundProject{value: STARTING_BALANCE * 3}(0);
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.finishProject(0);
+
+        assertEq(
+            project.getAmountToBePaidOut(INVESTOR),
+            project.calculateInvestedPlusInterest(
+                MAX_INVESTMENT + MAX_INVESTMENT,
+                INTEREST_RATE
+            )
+        );
+        assertEq(
+            project.getAmountToBePaidOut(INVESTOR2),
+            project.calculateInvestedPlusInterest(MAX_INVESTMENT, INTEREST_RATE)
         );
     }
 }
