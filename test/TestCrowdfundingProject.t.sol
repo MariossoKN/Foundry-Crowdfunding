@@ -28,7 +28,9 @@ contract TestCrowdfundingProject is Test {
 
     string PROJECT_NAME = "Grand Resort Crowdfund Project";
     uint256 CROWDFUNDING_AMOUNT = 150 ether;
-    uint256 INTEREST_RATE = 10; // SHOULD BE IN WEI
+    uint256 INTEREST_RATE = 1000; // 10%
+    uint256 INTEREST_RATE2 = 1500; // 15%
+    uint256 INTEREST_RATE3 = 550; // 5.5%
     uint256 MIN_INVESTMENT = 5 ether;
     uint256 MAX_INVESTMENT = 50 ether;
     uint256 DEADLINE_IN_DAYS = 25;
@@ -960,19 +962,24 @@ contract TestCrowdfundingProject is Test {
 
         assertEq(
             expectedPayOut,
-            ((MAX_INVESTMENT * 2) / INTEREST_RATE) + MAX_INVESTMENT * 2
+            project.calculateInvestedPlusInterest(
+                MAX_INVESTMENT * 2,
+                INTEREST_RATE
+            )
         );
         assertEq(
             expectedPayOut2,
-            ((CORRECT_INVESTMENT_AMOUNT * 3) / INTEREST_RATE) +
-                CORRECT_INVESTMENT_AMOUNT *
-                3
+            project.calculateInvestedPlusInterest(
+                CORRECT_INVESTMENT_AMOUNT * 3,
+                INTEREST_RATE
+            )
         );
         assertEq(
             expectedPayOut3,
-            ((CORRECT_INVESTMENT_AMOUNT * 2) / INTEREST_RATE) +
-                CORRECT_INVESTMENT_AMOUNT *
-                2
+            project.calculateInvestedPlusInterest(
+                CORRECT_INVESTMENT_AMOUNT * 2,
+                INTEREST_RATE
+            )
         );
 
         assertEq(investorBalanceAfter, investorBalanceBefore + expectedPayOut);
@@ -1005,26 +1012,6 @@ contract TestCrowdfundingProject is Test {
             )
         );
         project.ownerFund();
-    }
-
-    function testRevertsIfCalledInClosedState() public {
-        CrowdfundingProject project = createProject();
-
-        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
-        vm.roll(block.number + 1);
-        project.performUpkeep("");
-
-        assertEq(uint256(project.getProjectStatus()), 0);
-
-        vm.prank(PROJECT_OWNER);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CrowdfundingProject
-                    .CrowdfundingProject__InvestingIsNotActive
-                    .selector
-            )
-        );
-        crowdfunding.ownerFundProject{value: MAX_INVESTMENT}(0);
     }
 
     function testShouldRevertIfCalledInClosedState() public {
@@ -1111,6 +1098,175 @@ contract TestCrowdfundingProject is Test {
         assertEq(
             projectContractBalanceBefore + (STARTING_BALANCE * 3),
             projectContractBalanceAfter
+        );
+    }
+
+    /////////////////
+    // finish TEST //
+    /////////////////
+    function testShouldRevertIfNotCalledByCrowdfunding() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__CanOnlyBeCalledByTheCrowdfundingContract
+                    .selector
+            )
+        );
+        project.finish();
+    }
+
+    function testRevertsIfCalledInClosedState() public {
+        CrowdfundingProject project = createProject();
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        assertEq(uint256(project.getProjectStatus()), 0);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__InvestingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.finishProject(0);
+    }
+
+    function testShouldRevertIfInFundingState() public {
+        CrowdfundingProject project = createProject();
+
+        assertEq(uint256(project.getProjectStatus()), 1);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__InvestingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.finishProject(0);
+    }
+
+    function testShouldRevertIfInFinishedState() public {
+        CrowdfundingProject project = createProjectFullyFundItAndPerformUpkeepAndFinish();
+
+        assertEq(uint256(project.getProjectStatus()), 3);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__InvestingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.finishProject(0);
+    }
+
+    function testShouldRevertIfInCanceledState() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.cancelProject(0);
+
+        assertEq(uint256(project.getProjectStatus()), 4);
+
+        vm.prank(PROJECT_OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CrowdfundingProject
+                    .CrowdfundingProject__InvestingIsNotActive
+                    .selector
+            )
+        );
+        crowdfunding.finishProject(0);
+    }
+
+    function testShouldSetTheStateToFinishedAndSetPayOuts() public {
+        CrowdfundingProject project = createProject();
+
+        vm.prank(INVESTOR);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR2);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+        vm.prank(INVESTOR3);
+        crowdfunding.fundProject{value: MAX_INVESTMENT}(0);
+
+        assertEq(project.getAmountToBePaidOut(INVESTOR), 0);
+        assertEq(project.getAmountToBePaidOut(INVESTOR2), 0);
+        assertEq(project.getAmountToBePaidOut(INVESTOR3), 0);
+
+        vm.warp(block.timestamp + (DEADLINE_IN_DAYS * ONE_DAY_IN_SECONDS) + 1);
+        vm.roll(block.number + 1);
+        project.performUpkeep("");
+
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.ownerFundProject{value: STARTING_BALANCE * 3}(0);
+        vm.prank(PROJECT_OWNER);
+        crowdfunding.finishProject(0);
+
+        assertEq(
+            project.getAmountToBePaidOut(INVESTOR),
+            ((MAX_INVESTMENT * INTEREST_RATE) / 10000) + MAX_INVESTMENT
+        );
+        assertEq(
+            project.getAmountToBePaidOut(INVESTOR2),
+            ((MAX_INVESTMENT * INTEREST_RATE) / 10000) + MAX_INVESTMENT
+        );
+        assertEq(
+            project.getAmountToBePaidOut(INVESTOR3),
+            ((MAX_INVESTMENT * INTEREST_RATE) / 10000) + MAX_INVESTMENT
+        );
+        assertEq(uint256(project.getProjectStatus()), 3);
+    }
+
+    ///////////////////////////////////
+    // calculateInvestedPlusInterest //
+    ///////////////////////////////////
+    function testShouldRevertIfTheInteresValueIsZeroOrMoreThanTenThousand()
+        public
+    {}
+
+    function testShouldCalculateAmountInvestedPlusInterest() public {
+        uint256 expectedCalculatedAmount = ((MIN_INVESTMENT * INTEREST_RATE) /
+            10000) + MIN_INVESTMENT;
+        // 5500000000000000000 (5.5 ETH)
+        uint256 expectedCalculatedAmount2 = ((MAX_INVESTMENT * INTEREST_RATE2) /
+            10000) + MAX_INVESTMENT;
+        // 57500000000000000000 (57.5 ETH)
+        uint256 expectedCalculatedAmount3 = ((CORRECT_INVESTMENT_AMOUNT *
+            INTEREST_RATE3) / 10000) + CORRECT_INVESTMENT_AMOUNT;
+        // 10550000000000000000 (10.55 ETH)
+
+        CrowdfundingProject project = createProject();
+
+        assertEq(
+            project.calculateInvestedPlusInterest(
+                MIN_INVESTMENT,
+                INTEREST_RATE
+            ),
+            expectedCalculatedAmount
+        );
+        assertEq(
+            project.calculateInvestedPlusInterest(
+                MAX_INVESTMENT,
+                INTEREST_RATE2
+            ),
+            expectedCalculatedAmount2
+        );
+        assertEq(
+            project.calculateInvestedPlusInterest(
+                CORRECT_INVESTMENT_AMOUNT,
+                INTEREST_RATE3
+            ),
+            expectedCalculatedAmount3
         );
     }
 }
