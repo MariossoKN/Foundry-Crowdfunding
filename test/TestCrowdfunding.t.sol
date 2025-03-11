@@ -318,7 +318,7 @@ contract TestCrowdfunding is Test {
         assertEq(project.getProjectName(), PROJECT_NAME);
         assertEq(project.getOwner(), PROJECT_OWNER);
         assertEq(project.getCrowdfundingAmount(), CROWDFUNDING_AMOUNT);
-        assertEq(project.getProjectInterestRateInPercent(), INTEREST_RATE);
+        assertEq(project.getProjectInterestRate(), INTEREST_RATE);
         assertEq(project.getProjectMinInvestment(), MIN_INVESTMENT);
         assertEq(project.getProjectMaxInvestment(), MAX_INVESTMENT);
         assertEq(project.getProjectDeadlineInDays(), DEADLINE_IN_DAYS);
@@ -686,35 +686,12 @@ contract TestCrowdfunding is Test {
         assertEq(expectedFee, actualFee);
     }
 
-    ////////////////////////////////////////////////////////////////
-    // getInvestorPaidOutStatus, getInvestorInvestmentAmount TEST //
-    ////////////////////////////////////////////////////////////////
-
-    function testGetInvestorInformation() public {
-        uint256 projectId = 0;
-        CrowdfundingProject project = createProject();
-
-        vm.startPrank(INVESTOR);
-        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT}(projectId);
-        vm.startPrank(INVESTOR2);
-        crowdfunding.fundProject{value: CORRECT_INVESTMENT_AMOUNT * 2}(
-            projectId
-        );
-
-        bool paidOut = project.getInvestorPaidOutStatus(INVESTOR);
-        assertEq(paidOut, false);
-        bool paidOut2 = project.getInvestorPaidOutStatus(INVESTOR2);
-        assertEq(paidOut2, false);
-
-        uint256 investorInvestmentAmount = project.getInvestorInvestmentAmount(
-            INVESTOR
-        );
-        uint256 investorInvestmentAmount2 = project.getInvestorInvestmentAmount(
-            INVESTOR2
-        );
-        assertEq(investorInvestmentAmount, CORRECT_INVESTMENT_AMOUNT);
-        assertEq(investorInvestmentAmount2, CORRECT_INVESTMENT_AMOUNT * 2);
-    }
+    ///////////////////////////
+    // getter functions TEST //
+    ///////////////////////////
+    /**
+     * @dev some getter functions are already tested in constructor/create project tests
+     */
 
     //////////////////////////////////////////////////////////////
     // getInvestedPlusInterestToAllInvestorsWithoutGasFees TEST //
@@ -741,10 +718,60 @@ contract TestCrowdfunding is Test {
         );
     }
 
+    /////////////////////////
+    // getInitialFees TEST //
+    /////////////////////////
+    function testShouldGetInitialFees() public {
+        createProject();
+
+        uint256 crowdfundingAmount1 = 100 ether;
+        uint256 crowdfundingAmount2 = 1200 ether;
+        uint256 crowdfundingAmount3 = 848 ether;
+
+        // fee = 0.1%
+        uint256 expectedFees1 = (crowdfundingAmount1 * crowdfundFeeInPrecent) /
+            1e18;
+        // 100000000000000000 (0.1 ETH)
+        uint256 expectedFees2 = (crowdfundingAmount2 * crowdfundFeeInPrecent) /
+            1e18;
+        // 1200000000000000000 (1.2 ETH)
+        uint256 expectedFees3 = (crowdfundingAmount3 * crowdfundFeeInPrecent) /
+            1e18;
+        // 848000000000000000 (0.848 ETH)
+
+        assertEq(
+            expectedFees1,
+            crowdfunding.getInitialFees(crowdfundingAmount1)
+        );
+        assertEq(
+            expectedFees2,
+            crowdfunding.getInitialFees(crowdfundingAmount2)
+        );
+        assertEq(
+            expectedFees3,
+            crowdfunding.getInitialFees(crowdfundingAmount3)
+        );
+    }
+
+    ///////////////////////////
+    // getProjectsCount TEST //
+    ///////////////////////////
+    function testShouldGetTheAmountOfProjects() public {
+        createProject();
+        createProject();
+
+        assertEq(crowdfunding.getProjectsCount(), 2);
+
+        createProject();
+        createProject();
+        createProject();
+
+        assertEq(crowdfunding.getProjectsCount(), 5);
+    }
+
     ////////////////////////////
     // fallback, receive TEST //
     ////////////////////////////
-
     function testReceive() public {
         vm.prank(INVESTOR);
         (bool success, ) = address(crowdfunding).call{value: 1 ether}("");
