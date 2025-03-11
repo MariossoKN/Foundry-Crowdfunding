@@ -131,7 +131,7 @@ contract TestCrowdfundingProject is Test {
         assertEq(project.getOwner(), PROJECT_OWNER);
         assertEq(project.getCrowdfundingAmount(), CROWDFUNDING_AMOUNT);
         assertEq(project.getCurrentFundedAmount(), 0);
-        assertEq(project.getProjectInterestRateInPercent(), INTEREST_RATE);
+        assertEq(project.getProjectInterestRate(), INTEREST_RATE);
         assertEq(project.getProjectMinInvestment(), MIN_INVESTMENT);
         assertEq(project.getProjectMaxInvestment(), MAX_INVESTMENT);
         assertEq(project.getProjectDeadlineInDays(), DEADLINE_IN_DAYS);
@@ -1270,7 +1270,7 @@ contract TestCrowdfundingProject is Test {
     // getter functions TEST //
     ///////////////////////////
     /**
-     * @dev some getter functions are already tested in constructor test
+     * @dev some getter functions are already tested in constructor/create project tests
      */
 
     ///////////////////////////////////////////
