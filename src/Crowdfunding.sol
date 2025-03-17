@@ -70,7 +70,6 @@ contract Crowdfunding {
     }
 
     error Crowdfunding__DeadlineIsTooShort(uint256);
-    error Crowdfunding__YouAreNotAllowedToCancelThisProject();
     error Crowdfunding__YouHaveToSendTheExactAmountForInitialFees(uint256);
     error Crowdfunding__CanBeCalledOnlyByOwner();
     error Crowdfunding__CanBeCalledOnlyByProjectOwner();
