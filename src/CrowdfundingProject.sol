@@ -402,4 +402,18 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
     function getCrowdfundingContractAddress() external view returns (address) {
         return s_crowdfundingContractAddress;
     }
+
+    /**
+     * @dev Fallback function to handle incoming ETH transfers. Reverts to prevent accidental ETH transfers.
+     */
+    fallback() external payable {
+        revert("Direct ETH transfers not allowed");
+    }
+
+    /**
+     * @dev Receive function to handle incoming ETH transfers. Reverts to prevent accidental ETH transfers.
+     */
+    receive() external payable {
+        revert("Direct ETH transfers not allowed");
+    }
 }
