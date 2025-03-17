@@ -3,9 +3,25 @@
 pragma solidity ^0.8.18;
 
 /**
- * @title
- * @author
- * @notice
+ * @title Crowdfunding
+ * @author Mariosso
+ * @notice This contract facilitates crowdfunding campaigns where project owners can raise funds and repay investors with interest. It acts as a manager crowdfunding projects.
+ * @dev The contract involves three main roles:
+ * 1. CROWDFUNDING CONTRACT OWNER:
+ *    - Sets the crowdfunding fee and minimum funding deadline during contract creation.
+ *    - Can withdraw fees collected from successful projects.
+ * 2. PROJECT OWNER:
+ *    - Creates and manages crowdfunding projects.
+ *    - Defines the funding goal, interest rate, and deadlines during project creation.
+ *    - Can cancel or finish projects, and fund the project contract to repay investors.
+ *    - After the funding deadline, Chainlink Automation determines if the funding goal was met:
+ *      a) If the goal is met, the funds are sent to the project owner, and the crowdfunding fee is sent to the manager contract.
+ *      b) If the goal is not met, investors can withdraw their investments.
+ * 3. INVESTORS:
+ *    - Fund projects within the specified investment limits.
+ *    - Can withdraw:
+ *      - their investments if the project is canceled/closed;
+ *      - their investment plus interest after the project is completed.
  */
 
 import {CrowdfundingProject} from "./CrowdfundingProject.sol";
@@ -69,25 +85,30 @@ contract Crowdfunding {
     address private immutable i_owner;
 
     /**
-     * @param _crowdfundFeeInPrecent fee in % which is taken by the contract if the project is successful; has to be paid by the project owner at project creation; has to be set in wei so it can be for example 0,05%
-     * @param _minDeadlineInDays minimum deadline which can be set by the project owner at project creation
+     * @dev Initializes the crowdfunding contract with the crowdfunding fee and minimum deadline.
+     * @param _crowdfundFeeInPercent The crowdfunding fee is a percentage of the total funding goal.
+     *        Expressed in wei (e.g., 10000000000000000 = 1%, 1000000000000000 = 0.1%).
+     * @param _minDeadlineInDays The minimum deadline (in days) that project owners must set for their projects.
      */
-    constructor(uint256 _crowdfundFeeInPrecent, uint256 _minDeadlineInDays) {
-        i_crowfundFeeInPercent = _crowdfundFeeInPrecent;
+    constructor(uint256 _crowdfundFeeInPercent, uint256 _minDeadlineInDays) {
+        i_crowfundFeeInPercent = _crowdfundFeeInPercent;
         i_minDeadlineInDays = _minDeadlineInDays;
         i_owner = payable(msg.sender);
     }
 
     /**
-     * @dev lets the crowdfunding project owner to create a new project (new contract); project owner has to pay the initial fee which is % from the crowdfunded amount. If projects funding will be successful, fees will be sent back to this contract; if the project will be canceled, the initial fees will be returned to project owner (minus gas fees)
-     * @param _crowdfundedAmount the amount the project owner wants to crowdfund
-     * @param _interestRate interest rates which should be paid to investors after vesting time
-     * @param _minInvestment minimum investment which can be invested by investors
-     * @param _maxInvestment maximum investment which can be invested by investors
-     * @param _deadlineInDays for how long the project should be active. When the deadline is reached and:
-     * 1. crowdfunding amount is reached, project will be set to INVESTING_ACITVE status and the project owner can withdraw the crowdfunded amount
-     * 2. crowdfunding amount is not reached, project will be set to CANCELLED status and the investors will be paid back the invested amount
-     * @param _investmentPeriodDays for how long the crowdfunded amount will be invested. After this time, investors have to be paid out the invested amount + interest
+     * @dev Allows a project owner to create a new crowdfunding project. The project owner must pay an initial fee, which is a percentage of the funding goal.
+     * If the project is successful, the fee is sent to the crowdfunding contract. If the project fails, the fee can be withdrawn by the project owner.
+     * @param _projectName The name of the project.
+     * @param _crowdfundedAmount The total amount the project owner aims to raise.
+     * @param _interestRate The interest rate (in basis points) to be paid to investors. (e.g., 10000 = 1%, 1000 = 10%).
+     * @param _minInvestment The minimum amount an investor can contribute.
+     * @param _maxInvestment The maximum amount an investor can contribute.
+     * @param _deadlineInDays The duration (in days) for which the project will be active. After this period:
+     *   - If the funding goal is met, the project transitions to INVESTING_ACTIVE, and the funds are sent to the project owner.
+     *   - If the funding goal is not met, the project is CLOSED, and investors can withdraw their contributions.
+     * @param _investmentPeriodDays The duration (in days) for which the raised funds will be invested. After this period, investors must be repaid their investment plus interest.
+     * @return The address of the newly created CrowdfundingProject contract.
      */
     function createProject(
         string memory _projectName,
@@ -99,7 +120,6 @@ contract Crowdfunding {
         uint256 _investmentPeriodDays
     ) external payable returns (CrowdfundingProject) {
         uint256 initialFees = calculateInitialFee(_crowdfundedAmount);
-        // q should there be a chek for min. msg.value, so if the project is canceled the investors pay back doesnt fail
         if (msg.value != initialFees) {
             revert Crowdfunding__YouHaveToSendTheExactAmountForInitialFees(
                 initialFees
@@ -144,11 +164,14 @@ contract Crowdfunding {
     }
 
     /**
-     * @dev lets the investor to fund to the desired project. The amount of the investment cant be less than the minInvestment and more than the maxInvestment. The amount also cant be more than the remaining crowdfunded amount - can be checked by getRemainingFundAmount function
-     * @dev the project has to be in FUNDING_ACTIVE state
-     * @param _projectId id of the project the user wants to fund
+     * @dev Allows an investor to fund a project. The investment amount must be:
+     * - Greater than or equal to the minimum investment.
+     * - Less than or equal to the maximum investment.
+     * - Not zero.
+     * - Not exceed the remaining funding amount (checkable via `getRemainingFundAmount`).
+     * @dev The project must be in the FUNDING_ACTIVE state.
+     * @param _projectId The ID of the project to fund.
      */
-    // q what happens if for example the project has a minInvestment of 1 ether, but the project only needs 0,5 ether to be fully funded??
     function fundProject(uint256 _projectId) external payable {
         if (msg.value == 0) {
             revert Crowdfunding__ValueSentCantBeZero();
@@ -161,8 +184,11 @@ contract Crowdfunding {
     }
 
     /**
-     * @dev lets the project owner to cancel the project; investors will get their investment back and the project owner will get back the (initial fees - gas fees). Can only be called by the owner address
-     * @param _projectId id of the project the project owner wants to cancel
+     * @dev Allows the project owner to cancel a project. After cancellation:
+     * - Investors can withdraw their contributions.
+     * - The project owner can withdraw the initial fees.
+     * @dev Can only be called by the project owner. The project must be in the FUNDING_ACTIVE state.
+     * @param _projectId The ID of the project to cancel.
      */
     function cancelProject(
         uint256 _projectId
@@ -175,8 +201,9 @@ contract Crowdfunding {
     }
 
     /**
-     * @dev lets the project owner to fund the project contract to be able to pay out the investors (keep in mind that the project owner has to pay gas fees to sent eth to investors)
-     * @param _projectId id of the project the project owner wants to fund
+     * @dev Allows the project owner to fund the project contract, enabling investors to withdraw their investments plus interest.
+     * @dev Can only be called by the project owner. The project must be in the INVESTING_ACTIVE state.
+     * @param _projectId The ID of the project to fund.
      */
     function ownerFundProject(
         uint256 _projectId
@@ -191,7 +218,11 @@ contract Crowdfunding {
         emit ProjectFundedOwner(msg.sender, _projectId);
     }
 
-    // lets the project owner to finish the project and pay out the investors; project owner has to first fund the project with the ownerFundProject function
+    /**
+     * @dev Allows the project owner to finish the project. The project must first be funded via `ownerFundProject` with the correct amount.
+     * @dev Can only be called by the project owner.
+     * @param _projectId The ID of the project to finish.
+     */
     function finishProject(
         uint256 _projectId
     ) external onlyProjectOwner(_projectId) {
@@ -207,7 +238,10 @@ contract Crowdfunding {
         projectContract.finish();
     }
 
-    // lets the crowdfunding owner to withdraw the fees paid by project owner
+    /**
+     * @dev Allows the crowdfunding contract owner to withdraw fees collected from successful projects.
+     * @dev Can only be called by the crowdfunding contract owner.
+     */
     function withdrawFees() external {
         if (msg.sender != i_owner) {
             revert Crowdfunding__CanBeCalledOnlyByOwner();
@@ -216,8 +250,12 @@ contract Crowdfunding {
         require(success, "Withdraw failed");
     }
 
-    // calculates the initial fees paid by project owner
-    // 150000000000000000000 (150ETH) * 500000000000000 (0.05%) = 7500000000000000000000000000000000000 = 0.075
+    /**
+     * @dev Calculates the initial fee that the project owner must pay during project creation.
+     * The fee is a percentage of the total funding goal.
+     * @param _maxCrowdfundingAmount The total funding goal set by the project owner.
+     * @return The initial fee amount in wei.
+     */
     function calculateInitialFee(
         uint256 _maxCrowdfundingAmount
     ) public view returns (uint256) {
@@ -292,7 +330,7 @@ contract Crowdfunding {
         address _owner
     ) external view returns (uint256[] memory) {
         uint256 arrayLength = s_crowdfundingProjectArray.length;
-        uint256[] memory projectIds = new uint256[](arrayLength); // Preallocate memory
+        uint256[] memory projectIds = new uint256[](arrayLength);
         uint256 count = 0;
         for (uint256 i = 0; i < arrayLength; i++) {
             if (s_crowdfundingProjectArray[i].owner == _owner) {
@@ -300,7 +338,6 @@ contract Crowdfunding {
                 count++;
             }
         }
-        // Trim the array to remove any unused elements
         uint256[] memory result = new uint256[](count);
         for (uint256 j = 0; j < count; j++) {
             result[j] = projectIds[j];
