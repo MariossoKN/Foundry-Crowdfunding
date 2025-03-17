@@ -22,6 +22,9 @@ pragma solidity ^0.8.18;
  *    - Can withdraw:
  *      - their investments if the project is canceled/closed;
  *      - their investment plus interest after the project is completed.
+ * @dev IMPORTANT: After a project is successfully funded, the full funded amount is sent to the project owner.
+ *      There is no mechanism to enforce repayment to investors. Investors must trust the project owner to repay them.
+ *      Investors should only fund projects from known and trusted addresses.
  */
 
 import {CrowdfundingProject} from "./CrowdfundingProject.sol";
@@ -170,6 +173,9 @@ contract Crowdfunding {
      * - Not exceed the remaining funding amount (checkable via `getRemainingFundAmount`).
      * @dev The project must be in the FUNDING_ACTIVE state.
      * @param _projectId The ID of the project to fund.
+     * @dev IMPORTANT: After a project is successfully funded, the full funded amount is sent to the project owner.
+     *      There is no mechanism to enforce repayment to investors. Investors must trust the project owner to repay them.
+     *      Investors should only fund projects from known and trusted addresses.
      */
     function fundProject(uint256 _projectId) external payable {
         if (msg.value == 0) {
