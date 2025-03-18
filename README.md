@@ -64,3 +64,18 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
+
+Deploying the Crowdfunding Contract
+
+    Update the constructor parameters in the deployment script (script/HelperConfig.s.sol):
+    solidity
+    Copy
+
+    uint256 crowdfundFeeInPercent = 500; // 0.05% in wei
+    uint256 minDeadlineInDays = 7;
+
+    Run the deployment script:
+    bash
+    Copy
+
+    forge script script/Deploy.s.sol --rpc-url <RPC_URL> --private-key <PRIVATE_KEY> --broadcast
