@@ -2,6 +2,40 @@
 
 pragma solidity ^0.8.18;
 
+/**
+ * @title Crowdfunding Project
+ * @author Mariosso
+ * @notice This contract is a child of the Crowdfunding manager contract. It handles the logic for determining if a project is successfully funded and manages payouts to investors.
+ * @dev The contract uses Chainlink Automation to check if the funding goal is met after the deadline. It has five main states:
+ * 1. FUNDING_ACTIVE:
+ *    - The initial state after project creation.
+ *    - During this state:
+ *      a) Investors can fund the project.
+ *      b) The project owner can cancel the project.
+ * 2. CLOSED:
+ *    - The project transitions to this state automatically if the funding goal is not met by the deadline.
+ *    - During this state:
+ *      a) Investors can withdraw their contributions.
+ *      b) The project owner can withdraw the initial fees paid during project creation.
+ * 3. INVESTING_ACTIVE:
+ *    - The project transitions to this state automatically if the funding goal is met by the deadline.
+ *    - During this state:
+ *      a) The crowdfunded amount is sent to the project owner.
+ *      b) The crowdfunding fees are sent to the manager contract.
+ *      c) The project owner can fund the project contract to repay investors and finish the project.
+ * 4. FINISHED:
+ *    - The project transitions to this state when the project owner calls the `finish` function and the contract has sufficient balance to repay investors.
+ *    - This is the final state of the project.
+ * 5. CANCELED:
+ *    - The project transitions to this state if the project owner cancels the project.
+ *    - During this state:
+ *      a) Investors can withdraw their contributions.
+ *      b) The project owner can withdraw the initial fees paid during project creation.
+ * @dev IMPORTANT: After a project is successfully funded, the full funded amount is sent to the project owner.
+ *      There is no mechanism to enforce repayment to investors. Investors must trust the project owner to repay them.
+ *      Investors should only fund projects from known and trusted addresses.
+ */
+
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 
 contract CrowdfundingProject is AutomationCompatibleInterface {
@@ -61,7 +95,18 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
     mapping(address investorAddress => Investor investor) private s_investor;
     address[] s_investors;
 
-    // creates the project with information given by project owner
+    /**
+     * @dev Initializes a new crowdfunding project with the provided details. The project state is set to FUNDING_ACTIVE, and the start timestamp is recorded.
+     * @param _projectName The name of the project.
+     * @param _projectOwner The address of the project owner.
+     * @param _maxCrowfundingAmount The total amount to be raised. Must be greater than or equal to the maximum investment.
+     * @param _interestRate The interest rate (in basis points) to be paid to investors. Must be between 1 and 10000 (0.01% to 100%).
+     * @param _minInvestment The minimum amount an investor can contribute. Must be less than the maximum investment.
+     * @param _maxInvestment The maximum amount an investor can contribute.
+     * @param _deadlineInDays The deadline (in days) by which the funding goal must be reached.
+     * @param _investmentPeriod The period (in days) during which the raised funds will be invested.
+     * @param _crowdfundingContractAddress The address of the main crowdfunding manager contract.
+     */
     constructor(
         string memory _projectName,
         address payable _projectOwner,
@@ -96,7 +141,16 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         s_crowdfundingContractAddress = _crowdfundingContractAddress;
     }
 
-    // fund the project
+    /**
+     * @dev Allows an investor to fund the project. Only callable by the Crowdfunding manager contract.
+     * @dev Can only be called during the FUNDING_ACTIVE state.
+     * @dev The funded amount must:
+     *      - Be greater than or equal to the minimum investment.
+     *      - Be less than or equal to the maximum investment.
+     *      - Not exceed the remaining funding amount.
+     * @dev The investor's funded amount and payout amount are calculated based on whether they have previously invested.
+     * @param _investorAddress The address of the investor.
+     */
     function fund(
         address _investorAddress
     ) external payable onlyCrowdfundingContract {
@@ -147,7 +201,11 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         }
     }
 
-    // Chainlink automation to check if the project is fully funded after the time interval
+    /**
+     * @dev Function used by Chainlink Automation to check if the funding deadline has passed.
+     * @return upkeepNeeded True if the deadline has passed, otherwise false.
+     * @return performData Additional data (not used in this implementation).
+     */
     function checkUpkeep(
         bytes memory /* checkData */
     )
@@ -161,6 +219,13 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
             (i_deadlineInDays * ONE_DAY_IN_SECONDS);
     }
 
+    /**
+     * @dev Function used by Chainlink Automation to determine if the funding goal was met after the deadline.
+     * @dev Can only be called during the FUNDING_ACTIVE state.
+     * @dev Transitions the project to:
+     *      - CLOSED state if the funding goal was not met.
+     *      - INVESTING_ACTIVE state if the funding goal was met.
+     */
     function performUpkeep(bytes calldata /* performData */) external override {
         (bool upkeepNeeded, ) = checkUpkeep("");
         if (!upkeepNeeded) {
@@ -184,7 +249,13 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         }
     }
 
-    // pays back the investors and cancels the project
+    /**
+     * @dev Cancels the crowdfunding project and sets payouts to investors and the project owner. Only callable by the Crowdfunding manager contract.
+     * @dev Can only be called during the FUNDING_ACTIVE state.
+     * @dev After cancellation:
+     *      - Investors can withdraw their contributions.
+     *      - The project owner can withdraw the initial fees paid during project creation.
+     */
     function cancel() external onlyCrowdfundingContract {
         if (s_projectState != ProjectState.FUNDING_ACTIVE) {
             revert CrowdfundingProject__FundingIsNotActive();
@@ -193,6 +264,13 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         setPayOuts();
     }
 
+    /**
+     * @dev Sets payouts to investors and the project owner based on the current project state.
+     * @dev Only callable internally.
+     * @dev Payout logic:
+     *      - CLOSED/CANCELED: Investors receive their invested amount; the project owner receives the remaining balance.
+     *      - FINISHED: Investors receive their invested amount plus interest; the project owner receives the remaining balance.
+     */
     function setPayOuts() internal {
         address[] memory temporaryInvestorsAddresses = s_investors;
 
@@ -225,7 +303,10 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
             amountInvestedOfAllInvestors);
     }
 
-    // lets the investors and owner withdraw if the project was CANCELED, CLOSED or FINISHED
+    /**
+     * @dev Allows investors and the project owner to withdraw their payouts.
+     * @dev Cannot be called if the caller has already withdrawn or if the payout has not been set.
+     */
     function withdrawPayOuts() external payable {
         if (s_investor[msg.sender].paidOut == true) {
             revert CrowdfundingProject__AlreadyWithdrawed();
@@ -240,7 +321,10 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         require(success, "Withdraw failed");
     }
 
-    // CALLED BY UPKEEP. withdraws the crowdfunded amount to project owner and sends the initial fees to crowdfunding contract
+    /**
+     * @dev Called automatically by the `performUpkeep` function. Withdraws the funded amount to the project owner and the remaining balance to the crowdfunding manager contract.
+     * @dev Only callable during the INVESTING_ACTIVE state. Only callable internally.
+     */
     function withdrawFunds() internal {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
             revert CrowdfundingProject__InvestingIsNotActive();
@@ -257,13 +341,23 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         require(success2, "Fees withdraw failed");
     }
 
+    /**
+     * @dev Owner fund to the project contract in oreder to pay out investors.
+     * @dev Only callable during INVESTING_ACTIVE state. Only callable by the crowdfunding manager contract.
+     */
     function ownerFund() external payable onlyCrowdfundingContract {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
             revert CrowdfundingProject__InvestingIsNotActive();
         }
     }
 
-    // finishes the project; sets payouts to the investors and to project owner
+    /**
+     * @dev Finishes the crowdfunding project and sets payouts to investors. The contract must have sufficient balance to cover all investor payouts.
+     * @dev Can only be called during the INVESTING_ACTIVE state. Only callable by the Crowdfunding manager contract.
+     * @dev After finishing:
+     *      - Investors can withdraw their contributions plus interest.
+     *      - The project owner can withdraw any remaining balance.
+     */
     function finish() external onlyCrowdfundingContract {
         if (s_projectState != ProjectState.INVESTING_ACTIVE) {
             revert CrowdfundingProject__InvestingIsNotActive();
@@ -273,7 +367,12 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         setPayOuts();
     }
 
-    // calculates how much the investor should get (based on the investment amount and interest rate) if the project is fully funded
+    /**
+     * @dev Calculates the total payout for an investor (investment amount + interest) when the project is finished.
+     * @param _amountInvested The amount invested by the investor.
+     * @param _interestRateInPercent The interest rate (in basis points) of the project.
+     * @return The total payout amount.
+     */
     function calculateInvestedPlusInterest(
         uint256 _amountInvested,
         uint256 _interestRateInPercent
@@ -403,6 +502,9 @@ contract CrowdfundingProject is AutomationCompatibleInterface {
         return s_crowdfundingContractAddress;
     }
 
+    //////////////////////
+    // FALLBACK RECEIVE //
+    //////////////////////
     /**
      * @dev Fallback function to handle incoming ETH transfers. Reverts to prevent accidental ETH transfers.
      */
