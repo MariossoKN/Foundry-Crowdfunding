@@ -1,81 +1,215 @@
-## Foundry
+### Crowdfunding Smart Contracts
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+**This repository contains Solidity smart contracts for a decentralized crowdfunding platform. The platform allows project owners to create crowdfunding campaigns, investors to fund projects, and automated payouts based on project success or failure.**
 
-Foundry consists of:
+### Table of Contents
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+    Overview
 
-## Documentation
+    Contracts
 
-https://book.getfoundry.sh/
+        Crowdfunding
 
-## Usage
+        CrowdfundingProject
 
-### Build
+    Features
 
-```shell
-$ forge build
-```
+    Setup
 
-### Test
+    Testing
+
+    Deployment
+
+    Interacting with the Contracts
+
+    Security Considerations
+
+    License
+
+### Overview
+
+The Crowdfunding platform consists of two main contracts:
+
+-    **Crowdfunding:** The manager contract that handles project creation and manages the overall crowdfunding process.
+
+-    **CrowdfundingProject:** A child contract created for each project. It handles funding, payouts, and state transitions.
+
+The platform uses Chainlink Automation to check if a project's funding goal is met after the deadline. Based on the outcome, the project transitions to either the CLOSED or INVESTING_ACTIVE state.
+
+### Contracts
+
+## Crowdfunding
+
+The main manager contract that allows project owners to create crowdfunding projects. It also handles fee collection and project management.
+Key Functions:
+
+-    **createProject:** Creates a new crowdfunding project.
+
+-    **fundProject:** Allows investors to fund a project.
+
+-    **cancelProject:** Allows the project owner to cancel a project.
+
+-    **finishProject:** Allows the project owner to finish a project and distribute payouts.
+
+-    **withdrawFees: Allows the contract owner to withdraw collected fees.
+
+## CrowdfundingProject
+
+A child contract created for each crowdfunding project. It handles funding, payouts, and state transitions.
+Key Functions:
+
+-    **fund:** Allows investors to fund the project.
+
+-    **cancel:** Cancels the project and sets payouts.
+
+-    **finish:** Finishes the project and sets payouts.
+
+-    **withdrawPayOuts:** Allows investors and the project owner to withdraw their payouts.
+
+States:
+
+    FUNDING_ACTIVE: The project is accepting funds.
+
+    CLOSED: The project failed to meet its funding goal.
+
+    INVESTING_ACTIVE: The project met its funding goal and is in the investment phase.
+
+    FINISHED: The project is completed, and payouts are distributed.
+
+    CANCELED: The project was canceled by the owner.
+
+### Features
+
+    Decentralized Crowdfunding: Project owners can create campaigns, and investors can fund them directly on the blockchain.
+
+    Automated State Transitions: Chainlink Automation checks if the funding goal is met after the deadline and transitions the project to the appropriate state.
+
+    Flexible Funding: Investors can fund projects within specified minimum and maximum investment limits.
+
+    Payouts: Investors can withdraw their funds if the project fails or their investment plus interest if the project succeeds.
+
+    Fee Collection: The platform collects a fee from successful projects.
+
+### Setup
+
+**Prerequisites**
+
+    Foundry (for testing and deployment).
+
+    Node.js (optional, for additional tooling).
+
+**Installation**
+
+    Clone the repository:
+  
+    ```shell
+    $ git clone https://github.com/MariossoKN/Foundry-Crowdfunding.git
+    $ cd crowdfunding
+    ```
+
+    Install Foundry:
+
+    ```shell
+    $ curl -L https://foundry.paradigm.xyz | bash
+    $ foundryup
+    ```
+
+    Install dependencies (if any):
+
+    ```shell
+    $ forge install
+    ```
+
+### Testing
+
+The project includes comprehensive tests written in Solidity using Foundry. To run the tests:
 
 ```shell
 $ forge test
 ```
 
-### Format
+**Test Coverage**
+
+To generate a test coverage report:
 
 ```shell
-$ forge fmt
+$ forge coverage
 ```
 
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+### Deployment
 
 Deploying the Crowdfunding Contract
 
     Update the constructor parameters in the deployment script (script/HelperConfig.s.sol):
-    solidity
-    Copy
 
-    uint256 crowdfundFeeInPercent = 500; // 0.05% in wei
+    uint256 crowdfundFeeInPrecent = 500; // 0.05% in wei
     uint256 minDeadlineInDays = 7;
 
     Run the deployment script:
-    bash
-    Copy
 
-    forge script script/Deploy.s.sol --rpc-url <RPC_URL> --private-key <PRIVATE_KEY> --broadcast
+    ```shell
+    $ forge script script/DeployCrowdfunding.s.sol --rpc-url <RPC_URL> --private-key <PRIVATE_KEY> --broadcast
+    ```
+
+Deploying a CrowdfundingProject
+
+    Use the createProject function in the Crowdfunding contract to deploy a new CrowdfundingProject.
+
+### Interacting with the Contracts
+
+**Creating a Project**
+
+Call the createProject function on the Crowdfunding contract:
+
+crowdfunding.createProject{value: initialFee}(
+    "Project Name",
+    100 ether, // Funding goal
+    1000, // Interest rate (10%)
+    1 ether, // Minimum investment
+    10 ether, // Maximum investment
+    30, // Deadline in days
+    365 // Investment period in days
+);
+
+**Funding a Project**
+
+Call the fundProject function on the Crowdfunding contract:
+
+crowdfunding.fundProject{value: 1 ether}(projectId);
+
+**Canceling a Project**
+
+Call the cancelProject function on the Crowdfunding contract:
+
+crowdfunding.cancelProject(projectId);
+
+**Finishing a Project**
+
+Call the finishProject function on the Crowdfunding contract:
+
+crowdfunding.finishProject(projectId);
+
+**Withdrawing Payouts**
+
+Call the withdrawPayOuts function on the CrowdfundingProject contract:
+
+crowdfundingProject.withdrawPayOuts();
+
+### Security Considerations
+
+    Trust Assumption: After a project is successfully funded, the full funded amount is sent to the project owner. There is no mechanism to enforce repayment to investors. Investors should only fund projects from known and trusted addresses.
+
+    Reentrancy: The contracts include checks to prevent reentrancy attacks.
+
+    Testing: The contracts have been thoroughly tested, but users should conduct their own audits before deploying to production.
+
+### License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+Acknowledgments
+
+    Foundry for the testing framework.
+
+    Chainlink for providing automation services.
+
+Feel free to customize this README.md to better suit your project's needs. Let me know if you need further assistance!
