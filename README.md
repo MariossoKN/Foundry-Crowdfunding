@@ -51,7 +51,7 @@ Key Functions:
 
 -    **finishProject:** Allows the project owner to finish a project and distribute payouts.
 
--    **withdrawFees: Allows the contract owner to withdraw collected fees.
+-    **withdrawFees:** Allows the contract owner to withdraw collected fees.
 
 ## CrowdfundingProject
 
@@ -68,57 +68,58 @@ Key Functions:
 
 States:
 
-    FUNDING_ACTIVE: The project is accepting funds.
+- FUNDING_ACTIVE: The project is accepting funds.
 
-    CLOSED: The project failed to meet its funding goal.
+- CLOSED: The project failed to meet its funding goal.
 
-    INVESTING_ACTIVE: The project met its funding goal and is in the investment phase.
+- INVESTING_ACTIVE: The project met its funding goal and is in the investment phase.
 
-    FINISHED: The project is completed, and payouts are distributed.
+- FINISHED: The project is completed, and payouts are distributed.
 
-    CANCELED: The project was canceled by the owner.
+- CANCELED: The project was canceled by the owner.
+
 
 ### Features
 
-    Decentralized Crowdfunding: Project owners can create campaigns, and investors can fund them directly on the blockchain.
+Decentralized Crowdfunding: Project owners can create campaigns, and investors can fund them directly on the blockchain.
 
-    Automated State Transitions: Chainlink Automation checks if the funding goal is met after the deadline and transitions the project to the appropriate state.
+Automated State Transitions: Chainlink Automation checks if the funding goal is met after the deadline and transitions the project to the appropriate state.
 
-    Flexible Funding: Investors can fund projects within specified minimum and maximum investment limits.
+Flexible Funding: Investors can fund projects within specified minimum and maximum investment limits.
 
-    Payouts: Investors can withdraw their funds if the project fails or their investment plus interest if the project succeeds.
+Payouts: Investors can withdraw their funds if the project fails or their investment plus interest if the project succeeds.
 
-    Fee Collection: The platform collects a fee from successful projects.
+Fee Collection: The platform collects a fee from successful projects.
 
 ### Setup
 
 **Prerequisites**
 
-    Foundry (for testing and deployment).
+Foundry (for testing and deployment).
 
-    Node.js (optional, for additional tooling).
+Node.js (optional, for additional tooling).
 
 **Installation**
 
-    Clone the repository:
-  
-    ```shell
-    $ git clone https://github.com/MariossoKN/Foundry-Crowdfunding.git
-    $ cd crowdfunding
-    ```
+Clone the repository:
 
-    Install Foundry:
+```shell
+$ git clone https://github.com/MariossoKN/Foundry-Crowdfunding.git
+$ cd crowdfunding
+```
 
-    ```shell
-    $ curl -L https://foundry.paradigm.xyz | bash
-    $ foundryup
-    ```
+Install Foundry:
 
-    Install dependencies (if any):
+```shell
+$ curl -L https://foundry.paradigm.xyz | bash
+$ foundryup
+```
 
-    ```shell
-    $ forge install
-    ```
+Install dependencies (if any):
+
+```shell
+$ forge install
+```
 
 ### Testing
 
@@ -140,20 +141,20 @@ $ forge coverage
 
 Deploying the Crowdfunding Contract
 
-    Update the constructor parameters in the deployment script (script/HelperConfig.s.sol):
+Update the constructor parameters in the deployment script (script/HelperConfig.s.sol):
 
-    uint256 crowdfundFeeInPrecent = 500; // 0.05% in wei
-    uint256 minDeadlineInDays = 7;
+uint256 crowdfundFeeInPrecent = 500; // 0.05% in wei
+uint256 minDeadlineInDays = 7;
 
-    Run the deployment script:
+Run the deployment script:
 
-    ```shell
-    $ forge script script/DeployCrowdfunding.s.sol --rpc-url <RPC_URL> --private-key <PRIVATE_KEY> --broadcast
-    ```
+```shell
+$ forge script script/DeployCrowdfunding.s.sol --rpc-url <RPC_URL> --private-key <PRIVATE_KEY> --broadcast
+```
 
 Deploying a CrowdfundingProject
 
-    Use the createProject function in the Crowdfunding contract to deploy a new CrowdfundingProject.
+Use the createProject function in the Crowdfunding contract to deploy a new CrowdfundingProject.
 
 ### Interacting with the Contracts
 
@@ -197,19 +198,19 @@ crowdfundingProject.withdrawPayOuts();
 
 ### Security Considerations
 
-    Trust Assumption: After a project is successfully funded, the full funded amount is sent to the project owner. There is no mechanism to enforce repayment to investors. Investors should only fund projects from known and trusted addresses.
+Trust Assumption: After a project is successfully funded, the full funded amount is sent to the project owner. There is no mechanism to enforce repayment to investors. Investors should only fund projects from known and trusted addresses.
 
-    Reentrancy: The contracts include checks to prevent reentrancy attacks.
+Reentrancy: The contracts include checks to prevent reentrancy attacks.
 
-    Testing: The contracts have been thoroughly tested, but users should conduct their own audits before deploying to production.
+Testing: The contracts have been thoroughly tested, but users should conduct their own audits before deploying to production.
 
 ### License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
 Acknowledgments
 
-    Foundry for the testing framework.
+Foundry for the testing framework.
 
-    Chainlink for providing automation services.
+Chainlink for providing automation services.
 
 Feel free to customize this README.md to better suit your project's needs. Let me know if you need further assistance!
