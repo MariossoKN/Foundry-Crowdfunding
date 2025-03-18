@@ -1602,4 +1602,23 @@ contract TestCrowdfundingProject is Test {
             project.calculateInvestedPlusInterest(MAX_INVESTMENT, INTEREST_RATE)
         );
     }
+
+    ///////////////////////////
+    // FALLBACK RECEIVE TEST //
+    ///////////////////////////
+    function testShouldRevertReceive() public {
+        CrowdfundingProject project = createProject();
+
+        vm.expectRevert();
+        (bool success, ) = address(project).call{value: 1 ether}("");
+    }
+
+    function testShouldRevertFallback() public {
+        CrowdfundingProject project = createProject();
+
+        vm.expectRevert();
+        (bool success, ) = address(project).call{value: 1 ether}(
+            abi.encodeWithSignature("invalidFunction()")
+        );
+    }
 }
