@@ -66,17 +66,17 @@ Key Functions:
 
 -    **withdrawPayOuts:** Allows investors and the project owner to withdraw their payouts.
 
-States:
+States of the Crowdfunding project:
 
-- FUNDING_ACTIVE: The project is accepting funds.
+- **FUNDING_ACTIVE**: The project is accepting funds.
 
-- CLOSED: The project failed to meet its funding goal.
+- **CLOSED**: The project failed to meet its funding goal.
 
-- INVESTING_ACTIVE: The project met its funding goal and is in the investment phase.
+- **INVESTING_ACTIVE**: The project met its funding goal and is in the investment phase.
 
-- FINISHED: The project is completed, and payouts are distributed.
+- **FINISHED**: The project is completed, and payouts are distributed.
 
-- CANCELED: The project was canceled by the owner.
+- **CANCELED**: The project was canceled by the owner.
 
 
 ## Features
@@ -93,13 +93,13 @@ Fee Collection: The platform collects a fee from successful projects.
 
 ## Setup
 
-**Prerequisites**
+### Prerequisites
 
     Foundry (for testing and deployment).
 
     Node.js (optional, for additional tooling).
 
-**Installation**
+### Installation
 
 Clone the repository:
 
@@ -115,7 +115,7 @@ $ curl -L https://foundry.paradigm.xyz | bash
 $ foundryup
 ```
 
-Install dependencies (if any):
+Install dependencies:
 
 ```shell
 $ forge install
@@ -129,7 +129,7 @@ The project includes comprehensive tests written in Solidity using Foundry. To r
 $ forge test
 ```
 
-**Test Coverage**
+### Test Coverage
 
 To generate a test coverage report:
 
@@ -139,12 +139,12 @@ $ forge coverage
 
 ## Deployment
 
-Deploying the Crowdfunding Contract
+Before deploying the Crowdfunding Contract update the constructor parameters in the deployment script `(script/HelperConfig.s.sol)`. Example:
 
-Update the constructor parameters in the deployment script (script/HelperConfig.s.sol):
-
+```
 uint256 crowdfundFeeInPrecent = 500; // 0.05% in wei
 uint256 minDeadlineInDays = 7;
+```
 
 Run the deployment script:
 
@@ -152,15 +152,13 @@ Run the deployment script:
 $ forge script script/DeployCrowdfunding.s.sol --rpc-url <RPC_URL> --private-key <PRIVATE_KEY> --broadcast
 ```
 
-Deploying a CrowdfundingProject
-
-Use the createProject function in the Crowdfunding contract to deploy a new CrowdfundingProject.
+To deploy a CrowdfundingProject use the `createProject` function in the Crowdfunding contract to deploy a new CrowdfundingProject.
 
 ## Interacting with the Contracts
 
-**Creating a Project**
+### Creating a Project
 
-Call the createProject function on the Crowdfunding contract:
+Call the `createProject` function on the Crowdfunding contract:
 
 ```
 crowdfunding.createProject{value: initialFee}(
@@ -174,33 +172,41 @@ crowdfunding.createProject{value: initialFee}(
 );
 ```
 
-**Funding a Project**
+### Funding a Project
 
-Call the fundProject function on the Crowdfunding contract:
+Call the `fundProject` function on the Crowdfunding contract:
 
 ```
 crowdfunding.fundProject{value: 1 ether}(projectId);
 ```
 
-**Canceling a Project**
+### Canceling a Project
 
-Call the cancelProject function on the Crowdfunding contract:
+Call the `cancelProject` function on the Crowdfunding contract:
 
 ```
 crowdfunding.cancelProject(projectId);
 ```
 
-**Finishing a Project**
+### Owner funding a Project
 
-Call the finishProject function on the Crowdfunding contract:
+Call the `ownerFundProject` function on the Crowdfunding contract:
+
+```
+crowdfunding.ownerFundProject{value: fundAmount}(projectId);
+```
+
+### Finishing a Project
+
+Call the `finishProject` function on the Crowdfunding contract:
 
 ```
 crowdfunding.finishProject(projectId);
 ```
 
-**Withdrawing Payouts**
+### *Withdrawing Payouts
 
-Call the withdrawPayOuts function on the CrowdfundingProject contract:
+Call the `withdrawPayOuts` function on the CrowdfundingProject contract:
 
 ```
 crowdfundingProject.withdrawPayOuts();
