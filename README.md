@@ -1,30 +1,30 @@
-## Crowdfunding Smart Contracts
+# Crowdfunding Smart Contracts
 
 **This repository contains Solidity smart contracts for a decentralized crowdfunding platform. The platform allows project owners to create crowdfunding campaigns, investors to fund projects, and automated payouts based on project success or failure.**
 
 ## Table of Contents
 
-    Overview
+    Overview [Link Text](#overview)
 
-    Contracts
+    Contracts [Link Text](#contracts)
 
-        Crowdfunding
+        Crowdfunding [Link Text](#crowdfunding)
 
-        CrowdfundingProject
+        CrowdfundingProject [Link Text](#crowdfundingproject)
 
-    Features
+    Features [Link Text](#features)
 
-    Setup
+    Setup [Link Text](#setup)
 
-    Testing
+    Testing [Link Text](#testing)
 
-    Deployment
+    Deployment [Link Text](#deployment)
 
-    Interacting with the Contracts
+    Interacting with the Contracts [Link Text](#interacting-with-the-contracts)
 
-    Security Considerations
+    Security Considerations [Link Text](#security-considerations)
 
-    License
+    License [Link Text](#license)
 
 ## Overview
 
@@ -162,39 +162,49 @@ Use the createProject function in the Crowdfunding contract to deploy a new Crow
 
 Call the createProject function on the Crowdfunding contract:
 
-crowdfunding.createProject{value: initialFee}(
-    "Project Name",
-    100 ether, // Funding goal
-    1000, // Interest rate (10%)
-    1 ether, // Minimum investment
-    10 ether, // Maximum investment
-    30, // Deadline in days
-    365 // Investment period in days
-);
+    ```
+    crowdfunding.createProject{value: initialFee}(
+        "Project Name",
+        100 ether, // Funding goal
+        1000, // Interest rate (10%)
+        1 ether, // Minimum investment
+        10 ether, // Maximum investment
+        30, // Deadline in days
+        365 // Investment period in days
+    );
+    ```
 
 **Funding a Project**
 
-Call the fundProject function on the Crowdfunding contract:
+    Call the fundProject function on the Crowdfunding contract:
 
-crowdfunding.fundProject{value: 1 ether}(projectId);
+    ```
+    crowdfunding.fundProject{value: 1 ether}(projectId);
+    ```
 
 **Canceling a Project**
 
-Call the cancelProject function on the Crowdfunding contract:
+    Call the cancelProject function on the Crowdfunding contract:
 
-crowdfunding.cancelProject(projectId);
+    ```
+    crowdfunding.cancelProject(projectId);
+    ```
 
 **Finishing a Project**
 
-Call the finishProject function on the Crowdfunding contract:
+    Call the finishProject function on the Crowdfunding contract:
 
-crowdfunding.finishProject(projectId);
+    ```
+    crowdfunding.finishProject(projectId);
+    ```
 
 **Withdrawing Payouts**
 
-Call the withdrawPayOuts function on the CrowdfundingProject contract:
+    Call the withdrawPayOuts function on the CrowdfundingProject contract:
 
-crowdfundingProject.withdrawPayOuts();
+    ```
+    crowdfundingProject.withdrawPayOuts();
+    ```
 
 ## Security Considerations
 
