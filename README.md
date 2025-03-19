@@ -139,7 +139,7 @@ $ forge coverage
 
 ## Deployment
 
-Before deploying the Crowdfunding Contract update the constructor parameters in the deployment script `(script/HelperConfig.s.sol)`. Example:
+Before deploying the Crowdfunding Contract, update the constructor parameters in the deployment script `(script/HelperConfig.s.sol)`. Example:
 
 ```
 uint256 crowdfundFeeInPrecent = 500; // 0.05% in wei
@@ -193,7 +193,7 @@ crowdfunding.cancelProject(projectId);
 Call the `ownerFundProject` function on the Crowdfunding contract:
 
 ```
-crowdfunding.ownerFundProject{value: fundAmount}(projectId);
+crowdfunding.ownerFundProject{value: 1 ether}(projectId);
 ```
 
 ### Finishing a Project
@@ -204,7 +204,7 @@ Call the `finishProject` function on the Crowdfunding contract:
 crowdfunding.finishProject(projectId);
 ```
 
-### *Withdrawing Payouts
+### Withdrawing Payouts
 
 Call the `withdrawPayOuts` function on the CrowdfundingProject contract:
 
