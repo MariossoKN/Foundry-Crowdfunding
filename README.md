@@ -4,27 +4,27 @@
 
 ## Table of Contents
 
-    [Overview](#overview)
+[Overview](#overview)
 
-    [Contracts](#contracts)
+[Contracts](#contracts)
 
-        [Crowdfunding](#crowdfunding)
+- [Crowdfunding](#crowdfunding)
 
-        [CrowdfundingProject](#crowdfundingproject)
+- [CrowdfundingProject](#crowdfundingproject)
 
-    [Features](#features)
+[Features](#features)
 
-    [Setup](#setup)
+[Setup](#setup)
 
-    [Testing](#testing)
+[Testing](#testing)
 
-    [Deployment](#deployment)
+[Deployment](#deployment)
 
-    [Interacting with the Contracts](#interacting-with-the-contracts)
+[Interacting with the Contracts](#interacting-with-the-contracts)
 
-    [Security Considerations](#security-considerations)
+[Security Considerations](#security-considerations)
 
-    [License](#license)
+[License](#license)
 
 ## Overview
 
@@ -176,35 +176,35 @@ crowdfunding.createProject{value: initialFee}(
 
 **Funding a Project**
 
-    Call the fundProject function on the Crowdfunding contract:
+Call the fundProject function on the Crowdfunding contract:
 
-    ```
-    crowdfunding.fundProject{value: 1 ether}(projectId);
-    ```
+```
+crowdfunding.fundProject{value: 1 ether}(projectId);
+```
 
 **Canceling a Project**
 
-    Call the cancelProject function on the Crowdfunding contract:
+Call the cancelProject function on the Crowdfunding contract:
 
-    ```
-    crowdfunding.cancelProject(projectId);
-    ```
+```
+crowdfunding.cancelProject(projectId);
+```
 
 **Finishing a Project**
 
-    Call the finishProject function on the Crowdfunding contract:
+Call the finishProject function on the Crowdfunding contract:
 
-    ```
-    crowdfunding.finishProject(projectId);
-    ```
+```
+crowdfunding.finishProject(projectId);
+```
 
 **Withdrawing Payouts**
 
-    Call the withdrawPayOuts function on the CrowdfundingProject contract:
+Call the withdrawPayOuts function on the CrowdfundingProject contract:
 
-    ```
-    crowdfundingProject.withdrawPayOuts();
-    ```
+```
+crowdfundingProject.withdrawPayOuts();
+```
 
 ## Security Considerations
 > [!CAUTION]
@@ -217,7 +217,8 @@ Testing: The contracts have been thoroughly tested, but users should conduct the
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
-Acknowledgments
+
+## Acknowledgments
 
 Foundry for the testing framework.
 
