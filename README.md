@@ -4,27 +4,27 @@
 
 ## Table of Contents
 
-    Overview [Link Text](#overview)
+    [Overview](#overview)
 
-    Contracts [Link Text](#contracts)
+    [Contracts](#contracts)
 
-        Crowdfunding [Link Text](#crowdfunding)
+        [Crowdfunding](#crowdfunding)
 
-        CrowdfundingProject [Link Text](#crowdfundingproject)
+        [CrowdfundingProject](#crowdfundingproject)
 
-    Features [Link Text](#features)
+    [Features](#features)
 
-    Setup [Link Text](#setup)
+    [Setup](#setup)
 
-    Testing [Link Text](#testing)
+    [Testing](#testing)
 
-    Deployment [Link Text](#deployment)
+    [Deployment](#deployment)
 
-    Interacting with the Contracts [Link Text](#interacting-with-the-contracts)
+    [Interacting with the Contracts](#interacting-with-the-contracts)
 
-    Security Considerations [Link Text](#security-considerations)
+    [Security Considerations](#security-considerations)
 
-    License [Link Text](#license)
+    [License](#license)
 
 ## Overview
 
@@ -95,9 +95,9 @@ Fee Collection: The platform collects a fee from successful projects.
 
 **Prerequisites**
 
-Foundry (for testing and deployment).
+    Foundry (for testing and deployment).
 
-Node.js (optional, for additional tooling).
+    Node.js (optional, for additional tooling).
 
 **Installation**
 
@@ -162,17 +162,17 @@ Use the createProject function in the Crowdfunding contract to deploy a new Crow
 
 Call the createProject function on the Crowdfunding contract:
 
-    ```
-    crowdfunding.createProject{value: initialFee}(
-        "Project Name",
-        100 ether, // Funding goal
-        1000, // Interest rate (10%)
-        1 ether, // Minimum investment
-        10 ether, // Maximum investment
-        30, // Deadline in days
-        365 // Investment period in days
-    );
-    ```
+```
+crowdfunding.createProject{value: initialFee}(
+    "Project Name",
+    100 ether, // Funding goal
+    1000, // Interest rate (10%)
+    1 ether, // Minimum investment
+    10 ether, // Maximum investment
+    30, // Deadline in days
+    365 // Investment period in days
+);
+```
 
 **Funding a Project**
 
@@ -207,8 +207,8 @@ Call the createProject function on the Crowdfunding contract:
     ```
 
 ## Security Considerations
-
-Trust Assumption: After a project is successfully funded, the full funded amount is sent to the project owner. There is no mechanism to enforce repayment to investors. Investors should only fund projects from known and trusted addresses.
+> [!CAUTION]
+> Trust Assumption: After a project is successfully funded, the full funded amount is sent to the project owner. There is no mechanism to enforce repayment to investors. Investors should only fund projects from known and trusted addresses.
 
 Reentrancy: The contracts include checks to prevent reentrancy attacks.
 
